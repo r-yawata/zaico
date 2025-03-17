@@ -1,0 +1,15 @@
+model User {
+  id         Int       @id @default(autoincrement())
+  username   String    @unique @map("username")
+  email      String    @unique @map("email")
+  password   String    @map("password")
+  createdAt  DateTime  @default(now()) @map("created_at") 
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  // 在庫登録の作成者、操作履歴などに利用
+  stocks     Stock[]         @relation("CreatorStocks")
+  stockHistories StockHistory[] @relation("UserStockHistories")
+  reservations   StockReservation[]
+  inventorySplits InventorySplitHistory[] @relation("UserInventorySplits")
+  operationLogs OperationLog[] @relation("UserOperationLogs")
+} 

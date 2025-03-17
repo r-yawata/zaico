@@ -1,0 +1,20 @@
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# do not ignore directories inside app
+!app/
+!package.json
+
+# !server/
+
+
+# !README.md
+# !tsconfig.json
+# !tsconfig.node.json
+# !tailwind.config.ts
+# !postcss.config.js
+# !jest.config.js
+

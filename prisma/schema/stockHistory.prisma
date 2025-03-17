@@ -1,0 +1,12 @@
+model StockHistory {
+  id              Int       @id @default(autoincrement())
+  stockId         Int       @map("stock_id")
+  stock           Stock     @relation(fields: [stockId], references: [id])
+  action          String    @map("action") // 「入庫」「出庫」「再入庫」「縮分」などの処理種別
+  weightChange    Decimal   @map("weight_change") // 重量差分（g単位）
+  performedAt     DateTime  @default(now()) @map("performed_at")
+  remarks         String?   @map("remarks")
+
+  performedById   Int       @map("performed_by_id")
+  performedBy     User      @relation("UserStockHistories", fields: [performedById], references: [id])
+} 

@@ -1,7 +1,8 @@
-#Specification document as following
-
-# Specimen Inventory Management System Specification
-
+---
+description: 
+globs: *.ts,*.tsx, *.js, *.jsx
+alwaysApply: true
+---
 ---
 description: Apply this rule to the entire repository
 globs: 
@@ -116,7 +117,6 @@ alwaysApply: true
 * **Database:** PostgreSQL
 * **ORM:** node-pg, Prisma。ただし、テーブル管理と、マイグレーション管理でのみ使用し、SQL文はnode-pgライブラリを用いて送信。
 * **TOOL:** npm
-* **TYPE:** APIの型はZodで肩を作成し、各コンポーネント内で使うオブジェクトにはtypescriptの型を使う
 * **Floating Point Precision:** Uses decimal.js for precision up to 0.001g
 
 

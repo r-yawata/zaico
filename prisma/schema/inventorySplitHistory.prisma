@@ -1,0 +1,12 @@
+model InventorySplitHistory {
+  id              Int       @id @default(autoincrement())
+  parentStockId   Int       @map("parent_stock_id")
+  parentStock     Stock     @relation(fields: [parentStockId], references: [id])
+  // 作成された子在庫のID群（複数の場合は JSON 等で管理）
+  childStockIds   Json      @map("child_stock_ids")
+  splitDate       DateTime  @default(now()) @map("split_date")
+  // 各子在庫への割り当て比率や数量の詳細情報を JSON 形式で保存
+  splitDetails    Json      @map("split_details")
+  performedById   Int       @map("performed_by_id")
+  performedBy     User      @relation("UserInventorySplits", fields: [performedById], references: [id])
+} 

@@ -1,0 +1,15 @@
+model StockExtraConfig {
+  id          Int       @id @default(autoincrement())
+  fieldName   String    @map("field_name") // 項目名
+  fieldType   String    @map("field_type") // "text", "select", "date" など
+  // select項目の場合の選択肢
+  selectOptions StockExtraConfigSelect[]
+}
+
+model StockExtraConfigSelect {
+  id            Int              @id @default(autoincrement())
+  name          String           @map("name") // 選択肢名
+  value         String           @map("value") // 選択肢の値
+  extraConfigId Int              @map("extra_config_id")
+  extraConfig   StockExtraConfig @relation(fields: [extraConfigId], references: [id])
+} 

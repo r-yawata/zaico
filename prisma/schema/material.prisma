@@ -1,0 +1,30 @@
+model Material {
+  id              Int       @id @default(autoincrement())
+  name            String    @map("name")
+  specification   String?   @map("specification")
+  // マスタとしてのカスタム属性（例：テキスト、選択肢、日付項目など）
+  customAttributes Json?    @map("custom_attributes")
+  // 錠剤等の場合の追加情報
+  packageCount    Int?      @map("package_count") // 「入り数」
+  unitWeight      String?   @map("unit_weight") // 「一個あたり重量」 (g単位、0.001g精度)
+  note            String    @map("note") // 備考フィールドをオプショナルから必須に変更
+
+  // リレーション：仕入先／メーカー／カテゴリー
+  supplierId      Int       @map("supplier_id")
+  supplier        Supplier @relation(fields: [supplierId], references: [id])
+  
+  manufacturerId  Int       @map("manufacturer_id")
+  manufacturer    Manufacturer? @relation(fields: [manufacturerId], references: [id])
+  
+  categoryId      Int       @map("category_id")
+  category        Category   @relation(fields: [categoryId], references: [id])
+  
+  createdAt       DateTime  @default(now()) @map("created_at") 
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  stocks          Stock[]
+  infoRule        StockInfoRule?
+  vessel          Vessel[]
+
+  stockReservations StockReservation[]  // StockReservation とのリレーション
+} 

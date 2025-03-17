@@ -1,0 +1,10 @@
+model OperationLog {
+  id                Int       @id @default(autoincrement())
+  operationType     String    @map("operation_type") // 'CREATE', 'UPDATE', 'DELETE' など
+  tableName         String    @map("table_name")
+  recordId          Int       @map("record_id")
+  userId            Int?      @map("user_id") // ユーザー認証がある場合
+  user              User?     @relation("UserOperationLogs", fields: [userId], references: [id])
+  operationDetails  Json?     @map("operation_details")
+  createdAt         DateTime  @default(now()) @map("created_at")
+} 

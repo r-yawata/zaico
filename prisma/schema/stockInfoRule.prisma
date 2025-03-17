@@ -1,0 +1,7 @@
+model StockInfoRule {
+  id                     Int       @id @default(autoincrement())
+  materialId             Int       @unique @map("material_id")
+  material               Material  @relation(fields: [materialId], references: [id])
+  // 許容誤差（％単位、例：0.5 → 0.5%）
+  allowedErrorPercentage Decimal   @map("allowed_error_percentage")
+} 

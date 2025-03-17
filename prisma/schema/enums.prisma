@@ -1,0 +1,9 @@
+enum SampleStatus {
+  STORED             // 保管中
+  OUTBOUND           // 出庫中（試験中）
+  USED               // 使用済
+  REINBOUND          // 再入庫済
+  WAITING_FOR_JUDGMENT // 判定待
+  WAITING_FOR_DISPOSAL // 廃棄待
+  DISPOSED           // 廃棄済
+} 

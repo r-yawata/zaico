@@ -1,0 +1,45 @@
+model Stock {
+  id                Int         @id @default(autoincrement())
+  productName       String      @map("product_name") // 品名
+  lot               String      @map("lot") // ロット
+  status            SampleStatus @map("status")
+  registrationDate  DateTime    @default(now()) @map("registration_date") // 登録日
+  updateDate        DateTime    @updatedAt @map("update_date") // 更新日
+  remarks           String?     @map("remarks")
+  
+  // 日付項目
+  expirationDate    DateTime    @map("expiration_date") // 有効期限
+  storageDate       DateTime    @map("storage_date") // 保管期限
+  
+  // 重量関連 (単位: g, 0.001g精度)
+  currentWeight     Decimal     @map("current_weight")
+  netWeight         Decimal     @map("net_weight")
+  vesselWeight      Decimal     @map("vessel_weight")
+  inboundWeight     Decimal     @map("inbound_weight") // 入庫時重量
+  
+  // リレーション：資材、容器、登録者
+  materialId        Int         @map("material_id")
+  material          Material    @relation(fields: [materialId], references: [id])
+  
+  vesselId          Int?        @map("vessel_id")
+  vessel            Vessel?     @relation(fields: [vesselId], references: [id])
+  
+  creatorId         Int         @map("creator_id")
+  creator           User        @relation("CreatorStocks", fields: [creatorId], references: [id])
+  
+  // カスタム項目等の余力：JSONで保持（入庫時・出庫予約・出庫時に登録可能）
+  extraConfig       Json?       @map("extra_config")
+  
+  // 親子関係（縮分／小分け処理）
+  parentStockId     Int?        @map("parent_stock_id")
+  parentStock       Stock?      @relation("StockSplits", fields: [parentStockId], references: [id])
+  childStocks       Stock[]     @relation("StockSplits")
+  
+  createdAt         DateTime    @default(now()) @map("created_at") 
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+
+  // 出庫予約やその他操作の履歴は別テーブルに記録
+  histories         StockHistory[]
+  inventorySplitHistories InventorySplitHistory[]
+} 

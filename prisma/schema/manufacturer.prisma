@@ -1,0 +1,10 @@
+model Manufacturer {
+  id         Int       @id @default(autoincrement())
+  name       String    @map("name")
+  location   String?   @map("location")
+  contact    String?   @map("contact")
+  createdAt  DateTime  @default(now()) @map("created_at") 
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  materials  Material[]
+} 

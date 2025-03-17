@@ -1,0 +1,20 @@
+model StockReservation {
+  id             Int       @id @default(autoincrement())
+  // 出庫予約時の資材情報
+  materialId     Int       @map("material_id")
+  material       Material  @relation(fields: [materialId], references: [id])
+  lot            String    @map("lot") // ロット番号
+  usage          String?   @map("usage") // 用途など
+  requiredAmount Decimal   @map("required_amount") // 必要量（最終的には重量単位で管理）
+  outboundDate   DateTime  @map("outbound_date") // 出庫日
+  returnDate     DateTime  @map("return_date") // 返却日（原則は当日。異なる場合は備考入力必須）
+  testName       String?   @map("test_name") // 試験名（カスタム項目）
+  remarks        String?   @map("remarks")
+  
+  creatorId      Int       @map("creator_id")
+  creator        User      @relation(fields: [creatorId], references: [id])
+  
+  createdAt      DateTime  @default(now()) @map("created_at") 
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+} 
