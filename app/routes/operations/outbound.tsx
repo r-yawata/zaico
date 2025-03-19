@@ -248,7 +248,7 @@ export default function Outbound() {
     setStep('select');
   };
   
-  // 予約一覧のカラム定義
+  // 予約一覧のカラム定義 
   const reservationColumns: TableColumn<StockReservation>[] = [
     { header: '予約ID', accessor: 'id' },
     { header: '資材', accessor: (res) => res.material?.name || '不明' },
