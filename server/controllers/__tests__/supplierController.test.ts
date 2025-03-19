@@ -111,7 +111,7 @@ describe('supplierRoutes', () => {
       
       // SQLユーティリティのモック
       (sqlUtils.generateSelectAllQuery as jest.Mock).mockReturnValue({
-        query: 'SELECT * FROM "Supplier"',
+        query: 'SELECT * FROM "Supplier" WHERE "enabled" = true',
         values: [],
       });
       
@@ -166,7 +166,7 @@ describe('supplierRoutes', () => {
       
       // SQLユーティリティのモック
       (sqlUtils.generateSelectByIdQuery as jest.Mock).mockReturnValue({
-        query: 'SELECT * FROM "Supplier" WHERE id = $1',
+        query: 'SELECT * FROM "Supplier" WHERE id = $1 AND "enabled" = true',
         values: ['1'],
       });
       
@@ -231,7 +231,7 @@ describe('supplierRoutes', () => {
           values: ['新規仕入先', '新規連絡先', '新規住所'],
         })
         .mockReturnValueOnce({
-          query: 'INSERT INTO "History" ...',
+          query: 'INSERT INTO "OperationLog" ...',
           values: ['CREATE', 'Supplier', 1, null, '{"id":1,"name":"新規仕入先"}'],
         });
       
@@ -347,7 +347,7 @@ describe('supplierRoutes', () => {
       
       // SQLユーティリティのモック
       (sqlUtils.generateSelectByIdQuery as jest.Mock).mockReturnValue({
-        query: 'SELECT * FROM "Supplier" WHERE id = $1',
+        query: 'SELECT * FROM "Supplier" WHERE id = $1 AND "enabled" = true',
         values: ['1'],
       });
       
@@ -357,7 +357,7 @@ describe('supplierRoutes', () => {
       });
       
       (sqlUtils.generateInsertQuery as jest.Mock).mockReturnValue({
-        query: 'INSERT INTO "History" ...',
+        query: 'INSERT INTO "OperationLog" ...',
         values: ['UPDATE', 'Supplier', '1', '{"id":1,"name":"元の仕入先"}', '{"id":1,"name":"更新仕入先"}'],
       });
       
@@ -450,29 +450,29 @@ describe('supplierRoutes', () => {
       mockRequest.params = { id: '1' };
     });
     
-    it('仕入先を正常に削除できること', async () => {
+    it('仕入先を正常に論理削除できること', async () => {
       // クライアントクエリのモック
       mockClient.query
         .mockResolvedValueOnce({ rows: [] }) // BEGIN
         .mockResolvedValueOnce({ rows: [{ id: 1, name: '削除仕入先', contact: '連絡先', address: '住所' }] }) // SELECT
         .mockResolvedValueOnce({ rows: [{ count: '0' }] }) // 関連データ確認
-        .mockResolvedValueOnce({ rows: [] }) // DELETE
+        .mockResolvedValueOnce({ rows: [{ id: 1, name: '削除仕入先', contact: '連絡先', address: '住所', enabled: false }] }) // 論理削除（UPDATE）
         .mockResolvedValueOnce({ rows: [] }) // History INSERT
         .mockResolvedValueOnce({ rows: [] }); // COMMIT
       
       // SQLユーティリティのモック
       (sqlUtils.generateSelectByIdQuery as jest.Mock).mockReturnValue({
-        query: 'SELECT * FROM "Supplier" WHERE id = $1',
+        query: 'SELECT * FROM "Supplier" WHERE id = $1 AND "enabled" = true',
         values: ['1'],
       });
       
       (sqlUtils.generateDeleteQuery as jest.Mock).mockReturnValue({
-        query: 'DELETE FROM "Supplier" WHERE id = $1',
+        query: 'UPDATE "Supplier" SET "enabled" = false, "updated_at" = NOW() WHERE id = $1 RETURNING *',
         values: ['1'],
       });
       
       (sqlUtils.generateInsertQuery as jest.Mock).mockReturnValue({
-        query: 'INSERT INTO "History" ...',
+        query: 'INSERT INTO "OperationLog" ...',
         values: ['DELETE', 'Supplier', '1', '{"id":1,"name":"削除仕入先"}', null],
       });
       

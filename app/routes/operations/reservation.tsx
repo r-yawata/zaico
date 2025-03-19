@@ -40,16 +40,16 @@ export default function Reservation() {
       if (!material) return;
       
       const newReservation = {
-        materialId: Number(materialId),
+        material_id: Number(materialId),
         material,
         lot,
         usage,
-        requiredAmount: new Decimal(requiredAmount),
-        outboundDate: new Date(outboundDate),
-        returnDate: new Date(returnDate),
-        testName,
+        required_amount: new Decimal(requiredAmount),
+        outbound_date: new Date(outboundDate),
+        return_date: new Date(returnDate),
+        test_name: testName,
         remarks,
-        creatorId: 1, // ダミーのユーザーID
+        creator_id: 1, // ダミーのユーザーID
         creator: {
           id: 1,
           username: 'testuser',
@@ -266,13 +266,13 @@ export default function Reservation() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{reservation.material.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{reservation.lot}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {reservation.requiredAmount.toString()}g
+                      {reservation.required_amount.toString()}g
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {formatDate(reservation.outboundDate)}
+                      {formatDate(reservation.outbound_date)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {formatDate(reservation.returnDate)}
+                      {formatDate(reservation.return_date)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button

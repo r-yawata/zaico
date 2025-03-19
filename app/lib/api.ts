@@ -100,7 +100,27 @@ export function convertAndAssertType<T>(data: any): T {
 
 /**
  * 配列データの日付変換を行う関数
+ * データが配列でない場合は単一オブジェクトとして処理
  */
-export function convertArrayDatesToObjects<T>(data: any[]): T[] {
-  return data.map(item => convertAndAssertType<T>(item));
+export function convertArrayDatesToObjects<T>(data: any): T[] {
+  // データが配列かどうかをチェック
+  if (!Array.isArray(data)) {
+    // 配列でない場合、データがオブジェクトかどうかをチェック
+    if (data && typeof data === 'object') {
+      // データがオブジェクトの場合、そのプロパティの中に配列があるかチェック
+      for (const key in data) {
+        if (Array.isArray(data[key])) {
+          // 配列プロパティが見つかった場合、それを変換して返す
+          return data[key].map((item: any) => convertAndAssertType<T>(item));
+        }
+      }
+      // 配列プロパティが見つからなかった場合、単一オブジェクトとして処理
+      return [convertAndAssertType<T>(data)];
+    }
+    // データがオブジェクトでもない場合、空配列を返す
+    console.warn('convertArrayDatesToObjects: データが配列でもオブジェクトでもありません', data);
+    return [];
+  }
+  // データが配列の場合、各要素を変換
+  return data.map((item: any) => convertAndAssertType<T>(item));
 } 

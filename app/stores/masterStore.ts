@@ -334,62 +334,58 @@ export const useMasterStore = create<MasterState>((set, get) => ({
   
   // 容器
   fetchVessels: async () => {
-    set({ loading: true, error: null });
-    try {
-      // ここで実際のAPI実装ができたら修正
-      set({ loading: false });
-    } catch (error) {
-      set({ error: (error as Error).message, loading: false });
-    }
+    await apiRequest({
+      endpoint: '/vessels',
+      errorMessage: '容器データの取得に失敗しました',
+      logPrefix: '容器データ取得',
+      transformResponse: (data) => convertArrayDatesToObjects<Vessel>(data),
+      onSuccess: (vessels: Vessel[], set: SetStateFunction) => set({ vessels, loading: false })
+    }, set);
   },
   
   addVessel: async (vessel) => {
-    set({ loading: true, error: null });
-    try {
-      // ここで実際のAPI実装ができたら修正
-      const newVessel: Vessel = {
-        ...vessel,
-        id: Math.max(0, ...get().vessels.map(v => v.id)) + 1,
-        created_at: new Date(),
-        updated_at: new Date()
-      };
-      set(state => ({
-        vessels: [...state.vessels, newVessel],
-        loading: false
-      }));
-    } catch (error) {
-      set({ error: (error as Error).message, loading: false });
-    }
+    await apiRequest({
+      endpoint: '/vessels',
+      method: 'POST',
+      data: vessel,
+      errorMessage: '容器の追加に失敗しました',
+      logPrefix: '容器追加',
+      transformResponse: (data) => convertAndAssertType<Vessel>(data),
+      onSuccess: (newVessel: Vessel, set: SetStateFunction) => set((state: MasterState) => ({ 
+        vessels: [...state.vessels, newVessel], 
+        loading: false 
+      }))
+    }, set);
   },
   
   updateVessel: async (id, vesselData) => {
-    set({ loading: true, error: null });
-    try {
-      // ここで実際のAPI実装ができたら修正
-      set(state => ({
-        vessels: state.vessels.map(vessel =>
-          vessel.id === id
-            ? { ...vessel, ...vesselData, updated_at: new Date() }
-            : vessel
+    await apiRequest({
+      endpoint: `/vessels/${id}`,
+      method: 'PUT',
+      data: vesselData,
+      errorMessage: '容器の更新に失敗しました',
+      logPrefix: '容器更新',
+      transformResponse: (data) => convertAndAssertType<Vessel>(data),
+      onSuccess: (updatedVessel: Vessel, set: SetStateFunction) => set((state: MasterState) => ({
+        vessels: state.vessels.map(vessel => 
+          vessel.id === id ? updatedVessel : vessel
         ),
         loading: false
-      }));
-    } catch (error) {
-      set({ error: (error as Error).message, loading: false });
-    }
+      }))
+    }, set);
   },
   
   deleteVessel: async (id) => {
-    set({ loading: true, error: null });
-    try {
-      // ここで実際のAPI実装ができたら修正
-      set(state => ({
+    await apiRequest({
+      endpoint: `/vessels/${id}`,
+      method: 'DELETE',
+      errorMessage: '容器の削除に失敗しました',
+      logPrefix: '容器削除',
+      onSuccess: (_: null, set: SetStateFunction) => set((state: MasterState) => ({
         vessels: state.vessels.filter(vessel => vessel.id !== id),
         loading: false
-      }));
-    } catch (error) {
-      set({ error: (error as Error).message, loading: false });
-    }
+      }))
+    }, set);
   },
   
   // 在庫情報ルール

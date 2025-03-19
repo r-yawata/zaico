@@ -7,7 +7,8 @@ import {
   generateDeleteQuery, 
   generateSelectByIdQuery,
   generateSelectAllQuery,
-  executeQuery
+  executeQuery,
+  generateHistoryInsertQuery
 } from '../utils/sqlUtils';
 import { 
   createVesselSchema, 
@@ -40,6 +41,8 @@ export default function vesselRoutes(fastify: FastifyInstance, opts: any, done: 
       // クエリを実行
       const result = await executeQuery(pool, query, values);
       
+      console.log(result.rows);
+
       reply.code(200).send({
         vessels: result.rows,
       });
@@ -114,15 +117,16 @@ export default function vesselRoutes(fastify: FastifyInstance, opts: any, done: 
       
       // 履歴を記録
       const historyData = {
-        action: 'CREATE',
+        operation_type: 'CREATE',
         table_name: 'Vessel',
         record_id: newVessel.id,
-        old_data: null,
-        new_data: JSON.stringify(newVessel),
-        created_at: new Date()
+        operation_details: JSON.stringify({
+          oldData: null,
+          newData: newVessel
+        }),
       };
       
-      const historyQuery = generateInsertQuery('History', historyData);
+      const historyQuery = generateHistoryInsertQuery('OperationLog', historyData);
       await client.query(historyQuery.query, historyQuery.values);
       
       // トランザクションをコミット
@@ -189,15 +193,17 @@ export default function vesselRoutes(fastify: FastifyInstance, opts: any, done: 
       
       // 履歴を記録
       const historyData = {
-        action: 'UPDATE',
+        operation_type: 'UPDATE',
         table_name: 'Vessel',
         record_id: id,
-        old_data: JSON.stringify(existingVessel),
-        new_data: JSON.stringify(updatedVessel),
+        operation_details: JSON.stringify({
+          oldData: existingVessel,
+          newData: updatedVessel
+        }),
         created_at: new Date()
       };
       
-      const historyQuery = generateInsertQuery('History', historyData);
+      const historyQuery = generateHistoryInsertQuery('OperationLog', historyData);
       await client.query(historyQuery.query, historyQuery.values);
       
       // トランザクションをコミット
@@ -258,15 +264,16 @@ export default function vesselRoutes(fastify: FastifyInstance, opts: any, done: 
       
       // 履歴を記録
       const historyData = {
-        action: 'DELETE',
+        operation_type: 'DELETE',
         table_name: 'Vessel',
         record_id: id,
-        old_data: JSON.stringify(existingVessel),
-        new_data: null,
-        created_at: new Date()
+        operation_details: JSON.stringify({
+          oldData: existingVessel,
+          newData: null
+        }),
       };
       
-      const historyQuery = generateInsertQuery('History', historyData);
+      const historyQuery = generateHistoryInsertQuery('OperationLog', historyData);
       await client.query(historyQuery.query, historyQuery.values);
       
       // トランザクションをコミット

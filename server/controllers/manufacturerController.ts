@@ -170,7 +170,7 @@ export default function manufacturerRoutes(fastify: FastifyInstance, opts: any, 
       }
       
       // SQLユーティリティを使用して更新クエリを生成
-      const { query, values } = generateUpdateQuery('Manufacturer', updateData, 'id', id);
+      const { query, values } = generateUpdateQuery('Manufacturer', manufacturerData, 'id', id);
       
       // クエリを実行（トランザクション内で）
       const result = await client.query(query, values);

@@ -104,7 +104,7 @@ export default function Inventory() {
   // 検索とフィルタリング
   const filteredStocks = stocks.filter(stock => {
     const matchesSearch = 
-      stock.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      stock.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       stock.lot.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (stock.material?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -205,23 +205,23 @@ export default function Inventory() {
       const inboundWeight = netWeight.plus(vesselWeight);
       
       const stockData = {
-        productName: data.productName,
+        product_name: data.productName,
         lot: data.lot,
         status: SampleStatus.STORED,
-        registrationDate: new Date(),
-        updateDate: new Date(),
+        registration_date: new Date(),
+        update_date: new Date(),
         remarks: data.remarks || '',
-        expirationDate: new Date(data.expirationDate),
-        storageDate: new Date(),
-        currentWeight: inboundWeight,
-        netWeight,
-        vesselWeight,
-        inboundWeight,
-        materialId: Number(data.materialId),
+        expiration_date: new Date(data.expirationDate),
+        storage_date: new Date(),
+        current_weight: inboundWeight,
+        net_weight: netWeight,
+        vessel_weight: vesselWeight,
+        inbound_weight: inboundWeight,
+        material_id: Number(data.materialId),
         material,
-        vesselId: Number(data.vesselId),
+        vessel_id: Number(data.vesselId),
         vessel,
-        creatorId: 1, // 仮のユーザーID
+        creator_id: 1, // 仮のユーザーID
         creator: stocks[0]?.creator, // 仮のユーザー情報
       };
       
@@ -237,13 +237,13 @@ export default function Inventory() {
     console.log('Row clicked:', stock, rowIndex);
     setEditingStock(stock);
     setFormData({
-      productName: stock.productName,
+      productName: stock.product_name,
       lot: stock.lot,
-      materialId: String(stock.materialId),
-      vesselId: String(stock.vesselId),
-      netWeight: stock.netWeight.toString(),
-      vesselWeight: stock.vesselWeight.toString(),
-      expirationDate: stock.expirationDate.toISOString().split('T')[0],
+      materialId: String(stock.material_id),
+      vesselId: String(stock.vessel_id || ''),
+      netWeight: stock.net_weight.toString(),
+      vesselWeight: stock.vessel_weight.toString(),
+      expirationDate: stock.expiration_date.toISOString().split('T')[0],
       remarks: stock.remarks || '',
     });
     setIsEditing(true);
@@ -268,17 +268,17 @@ export default function Inventory() {
       const vesselWeight = new Decimal(formData.vesselWeight);
       
       const updatedData = {
-        productName: formData.productName,
+        product_name: formData.productName,
         lot: formData.lot,
         remarks: formData.remarks,
-        expirationDate: new Date(formData.expirationDate),
-        netWeight,
-        vesselWeight,
-        materialId: Number(formData.materialId),
+        expiration_date: new Date(formData.expirationDate),
+        net_weight: netWeight,
+        vessel_weight: vesselWeight,
+        material_id: Number(formData.materialId),
         material,
-        vesselId: Number(formData.vesselId),
+        vessel_id: Number(formData.vesselId),
         vessel,
-        updateDate: new Date(),
+        update_date: new Date(),
       };
       
       await updateStock(editingStock.id, updatedData);
@@ -319,7 +319,7 @@ export default function Inventory() {
       const stock = stocks.find(s => s.id === id);
       if (!stock) return;
       
-      await issueStock(id, stock.currentWeight);
+      await issueStock(id, stock.current_weight);
       resetForm();
     } catch (error) {
       console.error('出庫処理エラー:', error);
@@ -332,7 +332,7 @@ export default function Inventory() {
       if (!stock) return;
       
       // 現在は全量再入庫とする
-      await reInboundStock(id, stock.netWeight.plus(stock.vesselWeight));
+      await reInboundStock(id, stock.net_weight.plus(stock.vessel_weight));
       resetForm();
     } catch (error) {
       console.error('再入庫処理エラー:', error);
@@ -342,7 +342,7 @@ export default function Inventory() {
   // テーブルのカラム定義
   const columns: TableColumn<Stock>[] = [
     { header: 'ID', accessor: 'id' },
-    { header: '製品名', accessor: 'productName' },
+    { header: '製品名', accessor: 'product_name' },
     { header: 'ロット', accessor: 'lot' },
     { header: '資材', accessor: (stock) => stock.material?.name || '-' },
     { 
@@ -353,8 +353,8 @@ export default function Inventory() {
         </span>
       )
     },
-    { header: '現在重量', accessor: (stock) => `${stock.currentWeight.toString()}g` },
-    { header: '有効期限', accessor: (stock) => new Date(stock.expirationDate).toLocaleDateString('ja-JP') },
+    { header: '現在重量', accessor: (stock) => `${stock.current_weight.toString()}g` },
+    { header: '有効期限', accessor: (stock) => new Date(stock.expiration_date).toLocaleDateString('ja-JP') },
     { 
       header: '操作', 
       accessor: (stock) => (
@@ -542,16 +542,16 @@ export default function Inventory() {
                             <h3 className="font-medium mb-2">在庫履歴</h3>
                             <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
                                 <p className="text-gray-500 dark:text-gray-400">
-                                    登録日: {new Date(editingStock.registrationDate).toLocaleDateString('ja-JP')}
+                                    登録日: {new Date(editingStock.registration_date).toLocaleDateString('ja-JP')}
                                 </p>
                                 <p className="text-gray-500 dark:text-gray-400">
-                                    更新日: {new Date(editingStock.updateDate).toLocaleDateString('ja-JP')}
+                                    更新日: {new Date(editingStock.update_date).toLocaleDateString('ja-JP')}
                                 </p>
                                 <p className="text-gray-500 dark:text-gray-400">
-                                    入庫時重量: {editingStock.inboundWeight.toString()}g
+                                    入庫時重量: {editingStock.inbound_weight.toString()}g
                                 </p>
                                 <p className="text-gray-500 dark:text-gray-400">
-                                    現在重量: {editingStock.currentWeight.toString()}g
+                                    現在重量: {editingStock.current_weight.toString()}g
                                 </p>
                                 <p className="text-gray-500 dark:text-gray-400">
                                     登録者: {editingStock.creator?.username || '-'}

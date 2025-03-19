@@ -134,7 +134,7 @@ export default function Outbound() {
     // 重量差のチェック
     if (selectedStock) {
       const tolerance = 0.05; // 5%の許容範囲（実際には資材マスタから取得）
-      const expectedWeight = selectedStock.currentWeight;
+      const expectedWeight = selectedStock.current_weight;
       const diff = weight.minus(expectedWeight).abs();
       const diffPercentage = diff.div(expectedWeight).times(100);
       
@@ -152,14 +152,14 @@ export default function Outbound() {
   const handleReservationSelect = (reservation: StockReservation) => {
     setSelectedReservation(reservation);
     // 予約に紐づく在庫を検索
-    const relatedStock = stocks.find(stock => stock.id === reservation.materialId);
+    const relatedStock = stocks.find(stock => stock.id === reservation.material_id);
     if (relatedStock) {
       setSelectedStock(relatedStock);
       // 予約情報を設定
-      setOutboundWeight(reservation.requiredAmount);
+      setOutboundWeight(reservation.required_amount);
       setPurpose(reservation.usage || '');
-      setTestName(reservation.testName || '');
-      setReturnDate(reservation.returnDate.toISOString().split('T')[0]);
+      setTestName(reservation.test_name || '');
+      setReturnDate(reservation.return_date.toISOString().split('T')[0]);
       setRemarks(reservation.remarks || '');
       
       setStep('scanning');
@@ -172,7 +172,7 @@ export default function Outbound() {
   const handleStockSelect = (stock: Stock) => {
     setSelectedStock(stock);
     // デフォルトで全量出庫に設定
-    setOutboundWeight(stock.currentWeight);
+    setOutboundWeight(stock.current_weight);
     setStep('scanning');
   };
   
@@ -194,10 +194,10 @@ export default function Outbound() {
       const updatedStock = {
         ...selectedStock,
         status: SampleStatus.OUTBOUND,
-        currentWeight: selectedStock.currentWeight.minus(outboundWeight),
-        lastOutboundDate: new Date(),
-        lastOutboundAmount: outboundWeight,
-        updateDate: new Date()
+        current_weight: selectedStock.current_weight.minus(outboundWeight),
+        last_outbound_date: new Date(),
+        last_outbound_amount: outboundWeight,
+        update_date: new Date()
       };
       
       await updateStock(selectedStock.id, updatedStock);
@@ -253,9 +253,9 @@ export default function Outbound() {
     { header: '予約ID', accessor: 'id' },
     { header: '資材', accessor: (res) => res.material?.name || '不明' },
     { header: 'ロット', accessor: 'lot' },
-    { header: '申請日', accessor: (res) => res.createdAt.toLocaleDateString('ja-JP') },
-    { header: '出庫予定日', accessor: (res) => res.outboundDate.toLocaleDateString('ja-JP') },
-    { header: '返却予定日', accessor: (res) => res.returnDate.toLocaleDateString('ja-JP') },
+    { header: '申請日', accessor: (res) => res.created_at.toLocaleDateString('ja-JP') },
+    { header: '出庫予定日', accessor: (res) => res.outbound_date.toLocaleDateString('ja-JP') },
+    { header: '返却予定日', accessor: (res) => res.return_date.toLocaleDateString('ja-JP') },
     { header: '用途', accessor: (res) => res.usage || '未指定' },
     { header: '状態', accessor: () => '予約中' } // 予約中のもののみ表示するため、固定値
   ];
@@ -265,9 +265,9 @@ export default function Outbound() {
     { header: 'ID', accessor: 'id' },
     { header: '資材', accessor: (stock) => stock.material?.name || '不明' },
     { header: 'ロット', accessor: 'lot' },
-    { header: '現在重量', accessor: (stock) => `${stock.currentWeight?.toString() || '0'} g` },
-    { header: '入庫日', accessor: (stock) => stock.registrationDate.toLocaleDateString('ja-JP') },
-    { header: '有効期限', accessor: (stock) => stock.expirationDate?.toLocaleDateString('ja-JP') || '無期限' }
+    { header: '現在重量', accessor: (stock) => `${stock.current_weight?.toString() || '0'} g` },
+    { header: '入庫日', accessor: (stock) => stock.registration_date.toLocaleDateString('ja-JP') },
+    { header: '有効期限', accessor: (stock) => stock.expiration_date?.toLocaleDateString('ja-JP') || '無期限' }
   ];
   
   return (
@@ -382,7 +382,7 @@ export default function Outbound() {
                           </div>
                           <div>
                             <span className="text-sm font-medium text-gray-500 dark:text-gray-400">現在重量:</span>
-                            <div className="text-lg font-semibold">{selectedStock.currentWeight.toString()} g</div>
+                            <div className="text-lg font-semibold">{selectedStock.current_weight.toString()} g</div>
                           </div>
                           <div>
                             <span className="text-sm font-medium text-gray-500 dark:text-gray-400">出庫予定量:</span>
@@ -483,7 +483,7 @@ export default function Outbound() {
                       
                       <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
                         <p>予定出庫量: {outboundWeight.toString()} g</p>
-                        <p>現在の重量: {selectedStock.currentWeight.toString()} g</p>
+                        <p>現在の重量: {selectedStock.current_weight.toString()} g</p>
                       </div>
                     </div>
                   </div>
@@ -572,7 +572,7 @@ export default function Outbound() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm font-medium">残量:</span>
-                          <span className="text-sm">{selectedStock.currentWeight.minus(outboundWeight).toString()} g</span>
+                          <span className="text-sm">{selectedStock.current_weight.minus(outboundWeight).toString()} g</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm font-medium">返却予定日:</span>

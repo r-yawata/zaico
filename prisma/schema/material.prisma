@@ -8,6 +8,7 @@ model Material {
   packageCount    Int?      @map("package_count") // 「入り数」
   unitWeight      String?   @map("unit_weight") // 「一個あたり重量」 (g単位、0.001g精度)
   note            String    @map("note") // 備考フィールドをオプショナルから必須に変更
+  enabled         Boolean   @default(true) @map("enabled") // 論理削除用フラグ
 
   // リレーション：仕入先／メーカー／カテゴリー
   supplierId      Int       @map("supplier_id")

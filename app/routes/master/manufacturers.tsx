@@ -188,8 +188,11 @@ export default function Manufacturers() {
     if (confirm('このメーカーを削除してもよろしいですか？')) {
       try {
         await deleteManufacturer(id);
+        setCurrentPage('list');
       } catch (error) {
         console.error('メーカー削除エラー:', error);
+        setFormError({ key: 'error', msg: 'メーカーの削除中にエラーが発生しました。' });
+        scrollToError();
       }
     }
   };
@@ -204,94 +207,108 @@ export default function Manufacturers() {
 
   return (
     <div className="space-y-4">
-      {/* メーカー一覧 - 常に表示するか、リスト表示時のみ表示 */}
-      {currentPage === 'list' && (<>
-            <div className="flex justify-end items-center">
-                <Button
-                onClick={createBtnHandler}
-                className="bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1"
-                >
-                新規登録
-                </Button>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-              <Table
-                columns={columns}
-                data={manufacturers}
-                isLoading={isLoading}
-                onRowClick={handleRowClick}
-                keyExtractor={(manufacturer) => manufacturer.id}
-                emptyMessage="データがありません"
-              />
-            </div>
-        </>
-      )}
-
-        {/* メーカー登録/編集フォーム - ページ状態によって表示/非表示を制御 */}
-        {(currentPage === 'create') && (
-        <div className="">
-          {/* エラー表示部分 */}
-          <div ref={errorRef}>
-            {formError.msg && (
-              <div 
-                className="p-4 mb-4 rounded-md" 
-                style={{
-                  background: formError.key === "warning" ? "#F4D03F" : "#FF6666",
-                  color: "#FFFFFF",
-                  fontWeight: "bold"
-                }}
-              >
-                {formError.msg}
-              </div>
-            )}
-          </div>
-          
-          <div className="p-6">
-            <FormGenerator
-              fields={getFormFields()}
-              initialData={formData}
-              onChange={handleChange}
-              onSubmit={handleFormSubmit}
-              className="max-w-2xl mx-auto"
-            />
-            
-            <div className="flex justify-center space-x-2 mt-4">
-              <Button
-                type="submit"
-                onClick={() => handleFormSubmit(formData as any)}
-                className={cn("bg-blue-600 text-white hover:bg-blue-700")}
-              >
-                登録
-              </Button>
-            </div>
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-2">データを読み込み中...</p>
           </div>
         </div>
-      )}
-      
-      {currentPage === 'edit' && (
-        <div className="w-full">
-          {/* エラー表示部分 */}
-          <div ref={errorRef}>
-            {formError.msg && (
-              <div 
-                className="p-4 mb-4 rounded-md" 
-                style={{
-                  background: formError.key === "warning" ? "#F4D03F" : "#FF6666",
-                  color: "#FFFFFF",
-                  fontWeight: "bold"
-                }}
-              >
-                {formError.msg}
+      ) : (
+        <>
+          {/* メーカー一覧 - 常に表示するか、リスト表示時のみ表示 */}
+          {currentPage === 'list' && (<>
+                <div className="flex justify-end items-center">
+                    <Button
+                    onClick={createBtnHandler}
+                    className="bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1"
+                    data-testid="create-manufacturer-button"
+                    >
+                    新規登録
+                    </Button>
+                </div>
+                
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                  <Table
+                    columns={columns}
+                    data={manufacturers}
+                    isLoading={isLoading}
+                    onRowClick={handleRowClick}
+                    keyExtractor={(manufacturer) => manufacturer.id}
+                    emptyMessage="データがありません"
+                    rowProps={(manufacturer) => ({
+                      'data-testid': `manufacturer-row-${manufacturer.id}`
+                    })}
+                  />
+                </div>
+            </>
+          )}
+
+          {/* メーカー登録/編集フォーム - ページ状態によって表示/非表示を制御 */}
+          {(currentPage === 'create') && (
+            <div className="">
+              {/* エラー表示部分 */}
+              <div ref={errorRef}>
+                {formError.msg && (
+                  <div 
+                    className="p-4 mb-4 rounded-md" 
+                    style={{
+                      background: formError.key === "warning" ? "#F4D03F" : "#FF6666",
+                      color: "#FFFFFF",
+                      fontWeight: "bold"
+                    }}
+                  >
+                    {formError.msg}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+              
+              <div className="p-6">
+                <FormGenerator
+                  fields={getFormFields()}
+                  initialData={formData}
+                  onChange={handleChange}
+                  onSubmit={handleFormSubmit}
+                  className="max-w-2xl mx-auto"
+                />
+                
+                <div className="flex justify-center space-x-2 mt-4">
+                  <Button
+                    type="submit"
+                    onClick={() => handleFormSubmit(formData as any)}
+                    className={cn("bg-blue-600 text-white hover:bg-blue-700")}
+                    data-testid="submit-manufacturer-button"
+                  >
+                    登録
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
           
-          <Tabs defaultValue="basic" className="w-full">
+          {currentPage === 'edit' && (
+            <div className="w-full">
+              {/* エラー表示部分 */}
+              <div ref={errorRef}>
+                {formError.msg && (
+                  <div 
+                    className="p-4 mb-4 rounded-md" 
+                    style={{
+                      background: formError.key === "warning" ? "#F4D03F" : "#FF6666",
+                      color: "#FFFFFF",
+                      fontWeight: "bold"
+                    }}
+                  >
+                    {formError.msg}
+                  </div>
+                )}
+              </div>
+              
+              <Tabs defaultValue="basic" className="w-full">
                 <div className="mb-4">
                     <TabsList>
-                        <TabsTrigger value="basic">基本情報</TabsTrigger>
-                        <TabsTrigger value="history">履歴</TabsTrigger>
+                        <TabsTrigger value="basic" data-testid="basic-info-tab">基本情報</TabsTrigger>
+                        <TabsTrigger value="history" data-testid="history-tab">履歴</TabsTrigger>
                     </TabsList>
                 </div>
 
@@ -306,12 +323,14 @@ export default function Manufacturers() {
                                 scrollToError();
                               }
                             }}
+                            data-testid="update-manufacturer-button"
                         >更新</Button>
                         
                         <Button
                             variant="outline"
                             className="bg-red-600 hover:bg-red-200 text-white border-red-600 flex items-center gap-1"
                             onClick={() => handleDelete(editingManufacturer?.id as number)}
+                            data-testid="delete-manufacturer-button"
                         >
                             <Trash2 className="h-4 w-4" />
                             削除
@@ -319,12 +338,12 @@ export default function Manufacturers() {
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-4">
-                        <div className="w-full">
+                        <div className="w-full md:w-1/2">
                             <FormGenerator
                                 fields={getFormFields()}
                                 initialData={formData}
                                 onChange={handleChange}
-                                className="max-w-2xl mx-auto"
+                                className="w-full"
                             />
                         </div>
                     </div>
@@ -335,8 +354,10 @@ export default function Manufacturers() {
                         準備中
                     </div>
                 </TabsContent>
-            </Tabs>
-        </div>
+              </Tabs>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

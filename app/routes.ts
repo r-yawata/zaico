@@ -25,7 +25,7 @@ export default [
       route("materials", "routes/master/materials.tsx"),
       route("suppliers", "routes/master/suppliers.tsx"),
       route("manufacturers", "routes/master/manufacturers.tsx"),
-      // route("vessels", "routes/master/vessels.tsx"),
+      route("vessels", "routes/master/vessels.tsx"),
     ]),
 
 ] satisfies RouteConfig;

@@ -2,13 +2,10 @@ model Vessel {
   id          Int       @id @default(autoincrement())
   name        String    @map("name")
   weight      Decimal   @map("weight") // 容器重量 (g単位、0.001g精度)
-  // 適用資材：変更時は過去データも保持するため、リレーションは任意とする
-  materialId  Int?      @map("material_id")
-  material    Material? @relation(fields: [materialId], references: [id])
-  
   createdAt   DateTime  @default(now()) @map("created_at") 
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
+  enabled    Boolean   @default(true) @map("enabled")
 
-  stocks      Stock[]
+  materials  Material[]
 } 

@@ -7,7 +7,8 @@ import {
   generateDeleteQuery, 
   generateSelectByIdQuery,
   generateSelectAllQuery,
-  executeQuery
+  executeQuery,
+  generateHistoryInsertQuery
 } from '../utils/sqlUtils';
 import { 
   createSupplierSchema, 
@@ -99,15 +100,15 @@ export default function supplierRoutes(fastify: FastifyInstance, opts: any, done
       
       // 履歴を記録
       const historyData = {
-        action: 'CREATE',
+        operation_type: 'CREATE',
         table_name: 'Supplier',
         record_id: newSupplier.id,
-        old_data: null,
-        new_data: JSON.stringify(newSupplier),
-        created_at: new Date()
+        operation_details: {
+          new_data: newSupplier
+        }
       };
       
-      const historyQuery = generateInsertQuery('History', historyData);
+      const historyQuery = generateHistoryInsertQuery('OperationLog', historyData);
       await client.query(historyQuery.query, historyQuery.values);
       
       // トランザクションをコミット
@@ -174,15 +175,16 @@ export default function supplierRoutes(fastify: FastifyInstance, opts: any, done
       
       // 履歴を記録
       const historyData = {
-        action: 'UPDATE',
+        operation_type: 'UPDATE',
         table_name: 'Supplier',
         record_id: id,
-        old_data: JSON.stringify(existingSupplier),
-        new_data: JSON.stringify(updatedSupplier),
-        created_at: new Date()
+        operation_details: {
+          old_data: existingSupplier,
+          new_data: updatedSupplier
+        }
       };
       
-      const historyQuery = generateInsertQuery('History', historyData);
+      const historyQuery = generateHistoryInsertQuery('OperationLog', historyData);
       await client.query(historyQuery.query, historyQuery.values);
       
       // トランザクションをコミット
@@ -243,15 +245,15 @@ export default function supplierRoutes(fastify: FastifyInstance, opts: any, done
       
       // 履歴を記録
       const historyData = {
-        action: 'DELETE',
+        operation_type: 'DELETE',
         table_name: 'Supplier',
         record_id: id,
-        old_data: JSON.stringify(existingSupplier),
-        new_data: null,
-        created_at: new Date()
+        operation_details: {
+          old_data: existingSupplier
+        }
       };
       
-      const historyQuery = generateInsertQuery('History', historyData);
+      const historyQuery = generateHistoryInsertQuery('OperationLog', historyData);
       await client.query(historyQuery.query, historyQuery.values);
       
       // トランザクションをコミット

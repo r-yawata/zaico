@@ -3,7 +3,7 @@ import pkg from 'pg';
 const { Client } = pkg;
 import dotenv from 'dotenv';
 import fastifyCors from '@fastify/cors';
-import { materialRoutes, categoryRoutes, manufacturerRoutes, supplierRoutes } from './controllers';
+import { materialRoutes, categoryRoutes, manufacturerRoutes, supplierRoutes, vesselRoutes } from './controllers';
 
 dotenv.config();
 
@@ -39,6 +39,7 @@ fastify.register(materialRoutes, { prefix: '/api/materials' });
 fastify.register(categoryRoutes, { prefix: '/api/categories' });
 fastify.register(manufacturerRoutes, { prefix: '/api/manufacturers' });
 fastify.register(supplierRoutes, { prefix: '/api/suppliers' });
+fastify.register(vesselRoutes, { prefix: '/api/vessels' });
 
 // // 古いエンドポイント（参考のために残しておく）
 // fastify.get('/materials', async (request, reply) => {

@@ -232,7 +232,7 @@ describe('materialRoutes', () => {
       
       // 既存資材の確認モック
       (sqlUtils.generateSelectByIdQuery as jest.Mock).mockReturnValue({
-        query: 'SELECT * FROM "Material" WHERE id = $1',
+        query: 'SELECT * FROM "Material" WHERE id = $1 AND "enabled" = true',
       });
       
       (sqlUtils.executeQuery as jest.Mock)
@@ -271,7 +271,7 @@ describe('materialRoutes', () => {
       
       // 既存資材の確認モック（資材なし）
       (sqlUtils.generateSelectByIdQuery as jest.Mock).mockReturnValue({
-        query: 'SELECT * FROM "Material" WHERE id = $1',
+        query: 'SELECT * FROM "Material" WHERE id = $1 AND "enabled" = true',
       });
       
       (sqlUtils.executeQuery as jest.Mock).mockResolvedValueOnce({ rows: [] });
@@ -295,15 +295,15 @@ describe('materialRoutes', () => {
       mockRequest.params = { id: '1' };
     });
     
-    it('資材を正常に削除できること', async () => {
+    it('資材を正常に論理削除できること', async () => {
       // 既存資材の確認モック
       (sqlUtils.generateSelectByIdQuery as jest.Mock).mockReturnValue({
-        query: 'SELECT * FROM "Material" WHERE id = $1',
+        query: 'SELECT * FROM "Material" WHERE id = $1 AND "enabled" = true',
       });
       
-      (sqlUtils.executeQuery as jest.Mock).mockResolvedValueOnce({ 
-        rows: [{ id: 1, name: '削除資材' }] 
-      });
+      (sqlUtils.executeQuery as jest.Mock)
+        .mockResolvedValueOnce({ rows: [{ id: 1, name: '削除資材' }] }) // 既存資材確認
+        .mockResolvedValueOnce({ rows: [{ id: 1, name: '削除資材', enabled: false }] }); // 論理削除後
       
       // 関連データ確認モック
       const mockPoolQuery = require('pg').Pool().query;
@@ -311,7 +311,7 @@ describe('materialRoutes', () => {
       
       // 削除クエリモック
       (sqlUtils.generateDeleteQuery as jest.Mock).mockReturnValue({
-        query: 'DELETE FROM "Material" WHERE id = $1',
+        query: 'UPDATE "Material" SET "enabled" = false, "updated_at" = NOW() WHERE id = $1 RETURNING *',
         values: ['1'],
       });
       
@@ -329,7 +329,7 @@ describe('materialRoutes', () => {
     it('存在しない資材の削除時に404を返すこと', async () => {
       // 既存資材の確認モック（資材なし）
       (sqlUtils.generateSelectByIdQuery as jest.Mock).mockReturnValue({
-        query: 'SELECT * FROM "Material" WHERE id = $1',
+        query: 'SELECT * FROM "Material" WHERE id = $1 AND "enabled" = true',
       });
       
       (sqlUtils.executeQuery as jest.Mock).mockResolvedValueOnce({ rows: [] });
@@ -350,7 +350,7 @@ describe('materialRoutes', () => {
     it('関連データがある場合に400を返すこと', async () => {
       // 既存資材の確認モック
       (sqlUtils.generateSelectByIdQuery as jest.Mock).mockReturnValue({
-        query: 'SELECT * FROM "Material" WHERE id = $1',
+        query: 'SELECT * FROM "Material" WHERE id = $1 AND "enabled" = true',
       });
       
       (sqlUtils.executeQuery as jest.Mock).mockResolvedValueOnce({ 

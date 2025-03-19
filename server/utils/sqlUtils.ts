@@ -136,7 +136,50 @@ export function generateUpdateQuery(
 }
 
 /**
- * 削除用のSQLクエリを生成するユーティリティ関数
+ * 論理削除用のSQLクエリを生成するユーティリティ関数
+ * enabledフラグをfalseに設定することで論理削除を実現
+ * @param tableName テーブル名
+ * @param idField ID列の名前
+ * @param id 削除対象のID
+ * @returns 生成されたSQLクエリと値の配列
+ */
+export function generateSoftDeleteQuery(
+  tableName: string,
+  idField: string = 'id',
+  id: string | number
+): { query: string; values: any[] } {
+  const query = `
+    UPDATE "${tableName}"
+    SET "enabled" = false, "updated_at" = NOW()
+    WHERE "${idField}" = $1
+    RETURNING *
+  `;
+  const values = [id];
+  
+  return { query, values };
+}
+
+/**
+ * 物理削除用のSQLクエリを生成するユーティリティ関数
+ * @param tableName テーブル名
+ * @param idField ID列の名前
+ * @param id 削除対象のID
+ * @returns 生成されたSQLクエリと値の配列
+ */
+export function generateHardDeleteQuery(
+  tableName: string,
+  idField: string = 'id',
+  id: string | number
+): { query: string; values: any[] } {
+  const query = `DELETE FROM "${tableName}" WHERE "${idField}" = $1`;
+  const values = [id];
+  
+  return { query, values };
+}
+
+/**
+ * 論理削除を考慮した削除用のSQLクエリを生成するユーティリティ関数
+ * 既存の関数名を維持しつつ、内部的には論理削除を実行
  * @param tableName テーブル名
  * @param idField ID列の名前
  * @param id 削除対象のID
@@ -147,10 +190,8 @@ export function generateDeleteQuery(
   idField: string = 'id',
   id: string | number
 ): { query: string; values: any[] } {
-  const query = `DELETE FROM "${tableName}" WHERE "${idField}" = $1`;
-  const values = [id];
-  
-  return { query, values };
+  // 論理削除を実行
+  return generateSoftDeleteQuery(tableName, idField, id);
 }
 
 /**
@@ -165,7 +206,7 @@ export function generateSelectByIdQuery(
   idField: string = 'id',
   id: string | number
 ): { query: string; values: any[] } {
-  const query = `SELECT * FROM "${tableName}" WHERE "${idField}" = $1`;
+  const query = `SELECT * FROM "${tableName}" WHERE "${idField}" = $1 AND "enabled" = true`;
   const values = [id];
   
   return { query, values };
@@ -183,7 +224,7 @@ export function generateSelectAllQuery(
   orderBy: string = 'id',
   orderDirection: 'ASC' | 'DESC' = 'ASC'
 ): { query: string; values: any[] } {
-  const query = `SELECT * FROM "${tableName}" ORDER BY "${orderBy}" ${orderDirection}`;
+  const query = `SELECT * FROM "${tableName}" WHERE "enabled" = true ORDER BY "${orderBy}" ${orderDirection}`;
   return { query, values: [] };
 }
 
