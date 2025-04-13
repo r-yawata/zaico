@@ -6,6 +6,7 @@ import { Textarea } from "./textarea";
 import * as Select from "@radix-ui/react-select";
 import { cn } from "../../lib/utils";
 import { Check, ChevronDown } from "lucide-react";
+import { DatePicker } from "./date-picker";
 
 // フォームフィールドの型定義
 export type FormFieldConfig = {
@@ -45,8 +46,12 @@ export interface FormGeneratorProps {
   inputWidth?: string;
   onSubmit?: (data: FormData) => void;
   onChange?: (field: string, value: string) => void;
+  children?: React.ReactNode;
 }
 
+// FormGeneratorは全てのフォームフィールドの値を文字列（string）として扱うように設計。以下の理由によるもの。今後変更を検討するのはあり
+// フォームの異なる入力タイプ（テキスト、数値、チェックボックスなど）を統一的に扱うため
+// 型変換の責任を明確に分離するため（フォーム層ではstring、ビジネスロジック層で適切な型に変換）
 export const FormGenerator: React.FC<FormGeneratorProps> = ({
   fields,
   initialData = {},
@@ -55,6 +60,7 @@ export const FormGenerator: React.FC<FormGeneratorProps> = ({
   inputWidth = 'w-full',
   onChange,
   onSubmit,
+  children,
 }) => {
   // フォームデータの状態
   const [formData, setFormData] = useState<FormData>(() => {
@@ -133,7 +139,7 @@ export const FormGenerator: React.FC<FormGeneratorProps> = ({
     // 入力要素のラッパークラス
     const inputWrapperClass = cn(
       width || inputWidth,
-      "flex-1"
+      "w-[320px]"
     );
 
     // 入力要素
@@ -217,12 +223,10 @@ export const FormGenerator: React.FC<FormGeneratorProps> = ({
 
       case 'date':
         inputElement = (
-          <Input
-            id={id}
-            type="date"
+          <DatePicker
             value={formData[id] || ''}
-            onChange={(e) => handleChange(id, e.target.value)}
-            required={required}
+            onChange={(value) => handleChange(id, value)}
+            placeholder={placeholder || "日付を選択"}
             disabled={disabled}
             className="w-full"
           />
@@ -313,12 +317,15 @@ export const FormGenerator: React.FC<FormGeneratorProps> = ({
     // レイアウトに応じたフィールドのレンダリング
     if (layout === 'horizontal') {
       return (
-        <div key={id} className="flex items-center space-x-4">
-          <div className="w-1/3">
+        <div key={id} className="grid grid-cols-[30%_70%] items-center">
+          <div>
             {labelElement}
           </div>
-          <div className="w-2/3 flex items-center">
-            <div className={inputWrapperClass}>
+          <div className="flex items-center min-w-0 justify-end">
+            <div className={cn(
+              width || inputWidth,
+              "w-[320px]"
+            )}>
               {inputElement}
             </div>
             {suffixElement}
@@ -353,6 +360,7 @@ export const FormGenerator: React.FC<FormGeneratorProps> = ({
       <div className={cn("space-y-6", layout === 'horizontal' && "space-y-4")}>
         {fields.map(renderField)}
       </div>
+      {children}
     </form>
   );
 };

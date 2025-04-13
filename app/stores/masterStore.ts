@@ -35,9 +35,9 @@ const API_BASE_URL = 'http://localhost:3001/api';
 // StockInfoRuleの型定義 - 後ほど適切なスキーマファイルに移動する予定
 export interface StockInfoRule {
   id: number;
-  material_id: number;
+  materialId: number;
   material?: Material;
-  allowed_error_percentage: Decimal;
+  allowedErrorPercentage: Decimal;
 }
 
 // モックデータ（一部だけ残しておきます）
@@ -46,34 +46,32 @@ const mockVessels: Vessel[] = [
     id: 1,
     name: 'ガラス容器A',
     weight: '5.3',
-    material_id: 1,
     material: null as any, // 後で実際のデータで上書き
-    created_at: new Date(),
-    updated_at: new Date()
+    createdAt: new Date().toISOString(), // Date型からstring型に変換
+    updatedAt: new Date().toISOString()  // Date型からstring型に変換
   },
   {
     id: 2,
     name: 'プラスチック容器A',
     weight: '4.2',
-    material_id: 2,
     material: null as any, // 後で実際のデータで上書き
-    created_at: new Date(),
-    updated_at: new Date()
+    createdAt: new Date().toISOString(), // Date型からstring型に変換
+    updatedAt: new Date().toISOString()  // Date型からstring型に変換
   }
 ];
 
 const mockStockInfoRules: StockInfoRule[] = [
   {
     id: 1,
-    material_id: 1,
+    materialId: 1,
     material: null as any, // 後で実際のデータで上書き
-    allowed_error_percentage: new Decimal(0.5)
+    allowedErrorPercentage: new Decimal(0.5)
   },
   {
     id: 2,
-    material_id: 2,
+    materialId: 2,
     material: null as any, // 後で実際のデータで上書き
-    allowed_error_percentage: new Decimal(1.0)
+    allowedErrorPercentage: new Decimal(1.0)
   }
 ];
 
@@ -83,37 +81,37 @@ interface MasterState {
   categories: Category[];
   materials: Material[];
   vessels: Vessel[];
-  stock_info_rules: StockInfoRule[];
+  stockInfoRules: StockInfoRule[];
   loading: boolean;
   error: string | null;
   
   // 仕入先
   fetchSuppliers: () => Promise<void>;
-  addSupplier: (supplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  addSupplier: (supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateSupplier: (id: number, supplierData: Partial<Supplier>) => Promise<void>;
   deleteSupplier: (id: number) => Promise<void>;
   
   // メーカー
   fetchManufacturers: () => Promise<void>;
-  addManufacturer: (manufacturer: Omit<Manufacturer, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  addManufacturer: (manufacturer: Omit<Manufacturer, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateManufacturer: (id: number, manufacturerData: Partial<Manufacturer>) => Promise<void>;
   deleteManufacturer: (id: number) => Promise<void>;
   
   // カテゴリー
   fetchCategories: () => Promise<void>;
-  addCategory: (category: Omit<Category, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  addCategory: (category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateCategory: (id: number, categoryData: Partial<Category>) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
   
   // 資材
   fetchMaterials: () => Promise<void>;
-  addMaterial: (material: Omit<Material, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  addMaterial: (material: Omit<Material, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateMaterial: (id: number, materialData: Partial<Material>) => Promise<void>;
   deleteMaterial: (id: number) => Promise<void>;
   
   // 容器
   fetchVessels: () => Promise<void>;
-  addVessel: (vessel: Omit<Vessel, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  addVessel: (vessel: Omit<Vessel, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateVessel: (id: number, vesselData: Partial<Vessel>) => Promise<void>;
   deleteVessel: (id: number) => Promise<void>;
   
@@ -130,7 +128,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
   categories: [],
   materials: [],
   vessels: mockVessels,
-  stock_info_rules: mockStockInfoRules,
+  stockInfoRules: mockStockInfoRules,
   loading: false,
   error: null,
   
@@ -312,14 +310,15 @@ export const useMasterStore = create<MasterState>((set, get) => ({
         // その後で変換
         const materials = data.materials.map((material: Material) => ({
           ...material,
-          created_at: new Date(material.created_at),
-          updated_at: new Date(material.updated_at)
+          createdAt: new Date(material.createdAt),
+          updatedAt: new Date(material.updatedAt)
         }));
         return {
           materials,
           categories: data.categories,
           suppliers: data.suppliers,
-          manufacturers: data.manufacturers
+          manufacturers: data.manufacturers,
+          vessels: data.vessels
         };
       },
       onSuccess: (data, set) => set({ 
@@ -327,6 +326,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
         categories: data.categories, 
         suppliers: data.suppliers, 
         manufacturers: data.manufacturers, 
+        vessels: data.vessels,
         loading: false 
       })
     }, set);
@@ -405,10 +405,10 @@ export const useMasterStore = create<MasterState>((set, get) => ({
       // ここで実際のAPI実装ができたら修正
       const newRule: StockInfoRule = {
         ...rule,
-        id: Math.max(0, ...get().stock_info_rules.map(r => r.id)) + 1
+        id: Math.max(0, ...get().stockInfoRules.map(r => r.id)) + 1
       };
       set(state => ({
-        stock_info_rules: [...state.stock_info_rules, newRule],
+        stockInfoRules: [...state.stockInfoRules, newRule],
         loading: false
       }));
     } catch (error) {
@@ -421,7 +421,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     try {
       // ここで実際のAPI実装ができたら修正
       set(state => ({
-        stock_info_rules: state.stock_info_rules.map(rule =>
+        stockInfoRules: state.stockInfoRules.map(rule =>
           rule.id === id
             ? { ...rule, ...ruleData }
             : rule
@@ -438,7 +438,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     try {
       // ここで実際のAPI実装ができたら修正
       set(state => ({
-        stock_info_rules: state.stock_info_rules.filter(rule => rule.id !== id),
+        stockInfoRules: state.stockInfoRules.filter(rule => rule.id !== id),
         loading: false
       }));
     } catch (error) {
@@ -449,7 +449,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
   addMaterial: async (material) => {
     const materialToSend = {
       ...material,
-      unit_weight: material.unit_weight ? material.unit_weight.toString() : undefined,
+      unitWeight: material.unitWeight ? material.unitWeight.toString() : undefined,
     };
     
     await apiRequest({
@@ -460,9 +460,9 @@ export const useMasterStore = create<MasterState>((set, get) => ({
       logPrefix: '資材追加',
       transformResponse: (data) => ({
         ...data,
-        unit_weight: data.unit_weight, // ? new Decimal(data.unit_weight) : undefined,
-        created_at: new Date(data.created_at),
-        updated_at: new Date(data.updated_at)
+        unitWeight: data.unitWeight, 
+        createdAt: new Date(data.createdAt),
+        updatedAt: new Date(data.updatedAt)
       }),
       onSuccess: (newMaterial, set) => set((state: MasterState) => ({ 
         materials: [...state.materials, newMaterial], 
@@ -475,7 +475,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     // Decimalをstringに変換
     const materialToSend = {
       ...materialData,
-      unit_weight: materialData.unit_weight ? materialData.unit_weight.toString() : undefined,
+      unitWeight: materialData.unitWeight ? materialData.unitWeight.toString() : undefined,
     };
     
     await apiRequest({
@@ -486,9 +486,9 @@ export const useMasterStore = create<MasterState>((set, get) => ({
       logPrefix: '資材更新',
       transformResponse: (data) => ({
         ...data,
-        unit_weight: data.unit_weight, // ? new Decimal(data.unit_weight) : undefined,
-        created_at: new Date(data.created_at),
-        updated_at: new Date(data.updated_at)
+        unitWeight: data.unitWeight,
+        createdAt: new Date(data.createdAt),
+        updatedAt: new Date(data.updatedAt)
       }),
       onSuccess: (updatedMaterial, set) => set((state: MasterState) => ({
         materials: state.materials.map(material => 

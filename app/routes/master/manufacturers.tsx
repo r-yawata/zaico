@@ -6,10 +6,37 @@ import { Button } from '../../components/ui/button';
 import { Trash2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import FormGenerator, { type FormFieldConfig, type FormData } from '../../components/ui/FormGenerator';
-import { Table, type TableColumn } from '../../components/ui/table';
+import { VirtualizedGridTable } from "../../components/ui/boxgrid/virtualized-grid-table"
+import { createColumnHelper } from "@tanstack/react-table"
 
 // ユーティリティ関数
 const cn = (...inputs: any[]) => inputs.filter(Boolean).join(" ");
+
+// カラムヘルパーの作成
+const columnHelper = createColumnHelper<Manufacturer>()
+const manufacturerColumns = [
+  columnHelper.accessor("id", {
+    header: "ID",
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor("name", {
+    header: "メーカー名",
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor("location", {
+    header: "所在地",
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor("contact", {
+    header: "連絡先",
+    cell: (info) => info.getValue(),
+  }),
+];
+
+// FormFieldConfigの型を拡張
+interface ExtendedFormFieldConfig extends FormFieldConfig {
+  inputType?: string;
+}
 
 export default function Manufacturers() {
   const { manufacturers, fetchManufacturers, addManufacturer, updateManufacturer, deleteManufacturer } = useMasterStore();
@@ -17,13 +44,13 @@ export default function Manufacturers() {
   const { setPageTitle, setBackButton } = useNavigationStore();
   const [isLoading, setIsLoading] = useState(true);
   
-  // 編集中のメーカー
+  // 編集中のメーカー名
   const [editingManufacturer, setEditingManufacturer] = useState<Manufacturer | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   // ページ表示状態管理（'list', 'create', 'edit'）
   const [currentPage, setCurrentPage] = useState<'list' | 'create' | 'edit'>('list');
   
-  // 新規メーカー用のフォーム状態
+  // 新規メーカー名用のフォーム状態
   const [formData, setFormData] = useState({
     name: '',
     location: '',
@@ -46,7 +73,7 @@ export default function Manufacturers() {
   
   // ページ表示時にタイトルを設定
   useEffect(() => {
-    setPageTitle('メーカー');
+    setPageTitle('メーカー名');
     
     return () => {
       // コンポーネントのアンマウント時にリセット
@@ -58,7 +85,7 @@ export default function Manufacturers() {
   // ページ状態が変わったときにタイトルと戻るボタンを更新
   useEffect(() => {
     if (currentPage === 'list') {
-      setPageTitle('メーカー');
+      setPageTitle('メーカー名');
       setBackButton(false);
     } else if (currentPage === 'create') {
       setPageTitle('新規登録');
@@ -73,6 +100,7 @@ export default function Manufacturers() {
     const loadData = async () => {
       setIsLoading(true);
       await fetchManufacturers();
+      
       setIsLoading(false);
     };
     
@@ -84,23 +112,25 @@ export default function Manufacturers() {
   };
 
   // FormGeneratorのフィールド定義
-  const getFormFields = (): FormFieldConfig[] => [
+  const getFormFields = (): ExtendedFormFieldConfig[] => [
     {
       id: 'name',
       label: 'メーカー名',
       elementType: 'input',
       required: true,
     },
-    {
-      id: 'location',
-      label: '所在地',
-      elementType: 'input',
-    },
-    {
-      id: 'contact',
-      label: '連絡先',
-      elementType: 'input',
-    }
+    // {
+    //   id: 'location',
+    //   label: '所在地',
+    //   elementType: 'input',
+    //   required: false,
+    // },
+    // {
+    //   id: 'contact',
+    //   label: '連絡先',
+    //   elementType: 'input',
+    //   required: false,
+    // },
   ];
   
   // フォームのバリデーション関数
@@ -109,6 +139,16 @@ export default function Manufacturers() {
       setFormError({ key: 'error', msg: 'メーカー名を入力してください。' });
       return false;
     }
+    
+    // if (!data.location || data.location.trim() === '') {
+    //   setFormError({ key: 'error', msg: '所在地を入力してください。' });
+    //   return false;
+    // }
+    
+    // if (!data.contact || data.contact.trim() === '') {
+    //   setFormError({ key: 'error', msg: '連絡先を入力してください。' });
+    //   return false;
+    // }
     
     setFormError({ key: '', msg: '' });
     return true;
@@ -137,16 +177,17 @@ export default function Manufacturers() {
       
       await addManufacturer(manufacturerData as any);
       
-      resetForm();
+      // フォームをクリアするが、画面遷移はしない
+      clearForm();
     } catch (error) {
-      console.error('メーカー保存エラー:', error);
-      setFormError({ key: 'error', msg: 'メーカーの保存中にエラーが発生しました。' });
+      console.error('メーカー名保存エラー:', error);
+      setFormError({ key: 'error', msg: 'メーカー名の保存中にエラーが発生しました。' });
       scrollToError();
     }
   };
   
-  const handleRowClick = (manufacturer: Manufacturer, rowIndex: number) => {
-    console.log('Row clicked:', manufacturer, rowIndex);
+  const handleRowClick = (manufacturer: Manufacturer) => {
+    console.log('Row clicked:', manufacturer);
     setEditingManufacturer(manufacturer);
     setFormData({
       name: manufacturer.name,
@@ -157,21 +198,28 @@ export default function Manufacturers() {
     setCurrentPage('edit');
   };
 
-  const updateFormSubmit = async (manufacturer: Manufacturer) => {
-    if (!manufacturer.id) {
-      return; // IDがない場合は更新しない
+  const updateFormSubmit = async (data: FormData) => {
+    if (!editingManufacturer) {
+      return; // 編集中のメーカー名がない場合は更新しない
     }
     
     try {
-      await updateManufacturer(manufacturer.id, manufacturer);
+      const manufacturerData = {
+        ...editingManufacturer,
+        name: data.name,
+        location: data.location,
+        contact: data.contact,
+      };
+      await updateManufacturer(editingManufacturer.id, manufacturerData);
       resetForm();
     } catch (error) {
-      console.error('メーカー更新エラー:', error);
-      setFormError({ key: 'error', msg: 'メーカーの更新中にエラーが発生しました。' });
+      console.error('メーカー名更新エラー:', error);
+      setFormError({ key: 'error', msg: 'メーカー名の更新中にエラーが発生しました。' });
       scrollToError();
     }
   };
 
+  // 元のresetFormはそのまま残す（戻るボタンなどで使用）
   const resetForm = () => {
     setEditingManufacturer(null);
     setFormData({
@@ -184,26 +232,33 @@ export default function Manufacturers() {
     setFormError({ key: '', msg: '' }); // エラー状態もリセット
   };
   
+  // フォームの内容だけをクリアする新しい関数を追加
+  const clearForm = () => {
+    setEditingManufacturer(null);
+    setFormData({
+      name: '',
+      location: '',
+      contact: '',
+    });
+    setIsEditing(false);
+    setFormError({ key: '', msg: '' }); // エラー状態もリセット
+    // 成功メッセージを表示
+    setFormError({ key: 'warning', msg: 'メーカーを登録しました。続けて登録できます。' });
+    scrollToError();
+  };
+  
   const handleDelete = async (id: number) => {
-    if (confirm('このメーカーを削除してもよろしいですか？')) {
+    if (confirm('このメーカー名を削除してもよろしいですか？')) {
       try {
         await deleteManufacturer(id);
         setCurrentPage('list');
       } catch (error) {
-        console.error('メーカー削除エラー:', error);
-        setFormError({ key: 'error', msg: 'メーカーの削除中にエラーが発生しました。' });
+        console.error('メーカー名削除エラー:', error);
+        setFormError({ key: 'error', msg: 'メーカー名の削除中にエラーが発生しました。' });
         scrollToError();
       }
     }
   };
-
-  // テーブルのカラム定義
-  const columns: TableColumn<Manufacturer>[] = [
-    { header: 'ID', accessor: 'id' },
-    { header: 'メーカー名', accessor: 'name' },
-    { header: '所在地', accessor: 'location' },
-    { header: '連絡先', accessor: 'contact' },
-  ];
 
   return (
     <div className="space-y-4">
@@ -216,7 +271,7 @@ export default function Manufacturers() {
         </div>
       ) : (
         <>
-          {/* メーカー一覧 - 常に表示するか、リスト表示時のみ表示 */}
+          {/* メーカー名一覧 - 常に表示するか、リスト表示時のみ表示 */}
           {currentPage === 'list' && (<>
                 <div className="flex justify-end items-center">
                     <Button
@@ -229,132 +284,86 @@ export default function Manufacturers() {
                 </div>
                 
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                  <Table
-                    columns={columns}
+                  <VirtualizedGridTable
                     data={manufacturers}
-                    isLoading={isLoading}
-                    onRowClick={handleRowClick}
-                    keyExtractor={(manufacturer) => manufacturer.id}
-                    emptyMessage="データがありません"
-                    rowProps={(manufacturer) => ({
-                      'data-testid': `manufacturer-row-${manufacturer.id}`
-                    })}
+                    columns={manufacturerColumns}
+                    enableSelection={false}
+                    enableFiltering={true}
+                    enableSorting={true}
+                    height="calc(100vh - 300px)"
+                    onRowSelectionChange={(rows) => {
+                      if (rows.length === 1) {
+                        handleRowClick(rows[0].original);
+                      }
+                    }}
                   />
                 </div>
             </>
           )}
 
-          {/* メーカー登録/編集フォーム - ページ状態によって表示/非表示を制御 */}
+          {/* メーカー名登録/編集フォーム - ページ状態によって表示/非表示を制御 */}
           {(currentPage === 'create') && (
             <div className="">
               {/* エラー表示部分 */}
               <div ref={errorRef}>
-                {formError.msg && (
-                  <div 
-                    className="p-4 mb-4 rounded-md" 
-                    style={{
-                      background: formError.key === "warning" ? "#F4D03F" : "#FF6666",
-                      color: "#FFFFFF",
-                      fontWeight: "bold"
-                    }}
-                  >
+                {formError.key && (
+                  <div className={`p-4 mb-4 rounded-md ${
+                    formError.key === 'error' 
+                      ? 'bg-red-50 text-red-800 dark:bg-red-900 dark:text-red-200' 
+                      : 'bg-yellow-50 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  }`}>
                     {formError.msg}
                   </div>
                 )}
               </div>
               
-              <div className="p-6">
+              <div className="bg-white dark:bg-gray-800 p-6 w-2/3 mx-auto rounded-lg shadow">
                 <FormGenerator
                   fields={getFormFields()}
                   initialData={formData}
                   onChange={handleChange}
-                  onSubmit={handleFormSubmit}
-                  className="max-w-2xl mx-auto"
-                />
-                
-                <div className="flex justify-center space-x-2 mt-4">
-                  <Button
-                    type="submit"
-                    onClick={() => handleFormSubmit(formData as any)}
-                    className={cn("bg-blue-600 text-white hover:bg-blue-700")}
-                    data-testid="submit-manufacturer-button"
-                  >
-                    登録
-                  </Button>
-                </div>
+                  onSubmit={currentPage === 'create' ? handleFormSubmit : updateFormSubmit}
+                >
+                  <div className="flex justify-center mt-4">
+                    <Button type="submit" className="bg-blue-600 text-white">
+                      {'新規登録'}
+                    </Button>
+                  </div>
+                </FormGenerator>
               </div>
             </div>
           )}
-          
-          {currentPage === 'edit' && (
-            <div className="w-full">
+
+          {/* 編集フォーム */}
+          {(currentPage === 'edit') && (
+            <div className="">
               {/* エラー表示部分 */}
               <div ref={errorRef}>
-                {formError.msg && (
-                  <div 
-                    className="p-4 mb-4 rounded-md" 
-                    style={{
-                      background: formError.key === "warning" ? "#F4D03F" : "#FF6666",
-                      color: "#FFFFFF",
-                      fontWeight: "bold"
-                    }}
-                  >
+                {formError.key && (
+                  <div className={`p-4 mb-4 rounded-md ${
+                    formError.key === 'error' 
+                      ? 'bg-red-50 text-red-800 dark:bg-red-900 dark:text-red-200' 
+                      : 'bg-yellow-50 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  }`}>
                     {formError.msg}
                   </div>
                 )}
               </div>
               
-              <Tabs defaultValue="basic" className="w-full">
-                <div className="mb-4">
-                    <TabsList>
-                        <TabsTrigger value="basic" data-testid="basic-info-tab">基本情報</TabsTrigger>
-                        <TabsTrigger value="history" data-testid="history-tab">履歴</TabsTrigger>
-                    </TabsList>
-                </div>
-
-                <TabsContent value="basic" className="mt-0 p-3">
-                    <div className="flex justify-end gap-2 -mt-14 mb-6">
-                        <Button 
-                            className="bg-green-600 hover:bg-green-700 text-white" 
-                            onClick={() => {
-                              if (validateForm(formData)) {
-                                updateFormSubmit({...editingManufacturer, ...formData} as Manufacturer);
-                              } else {
-                                scrollToError();
-                              }
-                            }}
-                            data-testid="update-manufacturer-button"
-                        >更新</Button>
-                        
-                        <Button
-                            variant="outline"
-                            className="bg-red-600 hover:bg-red-200 text-white border-red-600 flex items-center gap-1"
-                            onClick={() => handleDelete(editingManufacturer?.id as number)}
-                            data-testid="delete-manufacturer-button"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                            削除
-                        </Button>
-                    </div>
-
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="w-full md:w-1/2">
-                            <FormGenerator
-                                fields={getFormFields()}
-                                initialData={formData}
-                                onChange={handleChange}
-                                className="w-full"
-                            />
-                        </div>
-                    </div>
-                </TabsContent>
-
-                <TabsContent value="history" className="mt-0 p-3">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        準備中
-                    </div>
-                </TabsContent>
-              </Tabs>
+              <div className="bg-white dark:bg-gray-800 p-6 w-2/3 mx-auto rounded-lg shadow">
+                <FormGenerator
+                  fields={getFormFields()}
+                  initialData={formData}
+                  onChange={handleChange}
+                  onSubmit={updateFormSubmit}
+                >
+                  <div className="flex justify-center mt-4">
+                    <Button type="submit" className="bg-blue-600 text-white">
+                      更新
+                    </Button>
+                  </div>
+                </FormGenerator>
+              </div>
             </div>
           )}
         </>

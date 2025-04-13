@@ -8,7 +8,9 @@ import {
   generateDeleteQuery, 
   generateSelectByIdQuery,
   generateSelectAllQuery,
-  executeQuery
+  executeQuery,
+  transformToCamelCase,
+  transformToSnakeCase
 } from '../utils/sqlUtils';
 import { createManufacturerSchema, updateManufacturerSchema } from '../../app/sharedSchema/manufacturerSchema';
 
@@ -75,9 +77,10 @@ export default function manufacturerRoutes(fastify: FastifyInstance, opts: any, 
       // トランザクション開始
       await client.query('BEGIN');
       
-      // リクエストボディのバリデーション
+      // リクエストボディのデバッグ出力
       console.log('Request body:', request.body); // デバッグ用にリクエストボディを出力
       
+      // バリデーション
       const validation = createManufacturerSchema.safeParse(request.body);
       
       if (!validation.success) {
@@ -92,8 +95,11 @@ export default function manufacturerRoutes(fastify: FastifyInstance, opts: any, 
       const manufacturerData = validation.data;
       console.log('Validated data:', manufacturerData); // バリデーション後のデータを出力
       
+      // バリデーション済みデータをスネークケースに変換（DB操作のため）
+      const snakeCaseData = transformToSnakeCase(manufacturerData);
+      
       // SQLユーティリティを使用して挿入クエリを生成
-      const { query, values } = generateInsertQuery('Manufacturer', manufacturerData);
+      const { query, values } = generateInsertQuery('Manufacturer', snakeCaseData);
       
       // クエリを実行（トランザクション内で）
       const result = await client.query(query, values);
@@ -139,6 +145,9 @@ export default function manufacturerRoutes(fastify: FastifyInstance, opts: any, 
       // トランザクション開始
       await client.query('BEGIN');
       
+      // リクエストボディのデバッグ出力
+      console.log('Request body:', request.body);
+      
       // リクエストボディのバリデーション
       const validation = updateManufacturerSchema.safeParse(request.body);
       
@@ -151,6 +160,9 @@ export default function manufacturerRoutes(fastify: FastifyInstance, opts: any, 
       }
       
       const manufacturerData = validation.data;
+      
+      // バリデーション済みデータをスネークケースに変換（DB操作のため）
+      const snakeCaseData = transformToSnakeCase(manufacturerData);
       
       // 既存のメーカーを確認
       const checkQuery = generateSelectByIdQuery('Manufacturer', 'id', id).query;
@@ -170,7 +182,7 @@ export default function manufacturerRoutes(fastify: FastifyInstance, opts: any, 
       }
       
       // SQLユーティリティを使用して更新クエリを生成
-      const { query, values } = generateUpdateQuery('Manufacturer', manufacturerData, 'id', id);
+      const { query, values } = generateUpdateQuery('Manufacturer', snakeCaseData, 'id', id);
       
       // クエリを実行（トランザクション内で）
       const result = await client.query(query, values);

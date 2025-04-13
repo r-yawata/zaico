@@ -140,7 +140,7 @@ export default function Dashboard() {
                       {new Date(stock.registrationDate).toLocaleDateString('ja-JP')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {stock.currentWeight.toString()}g
+                      {stock.currentWeight ? stock.currentWeight.toString() : '0'}g
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
@@ -201,14 +201,8 @@ export default function Dashboard() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {expiryDate.toLocaleDateString('ja-JP')}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          daysLeft <= 7 ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 
-                          daysLeft <= 14 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' : 
-                          'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        }`}>
-                          {daysLeft}日
-                        </span>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {daysLeft}日
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <button
@@ -224,7 +218,7 @@ export default function Dashboard() {
               ) : (
                 <tr>
                   <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                    有効期限が近い在庫はありません
+                    期限の近い在庫はありません
                   </td>
                 </tr>
               )}

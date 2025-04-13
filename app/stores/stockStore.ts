@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Decimal } from 'decimal.js';
 import type { Stock } from '../types';
 import { SampleStatus } from '../types';
+import { apiRequest } from '../lib/api';
 
 // モックデータ用の日付を作成
 const today = new Date();
@@ -11,112 +12,116 @@ const storageDate = new Date();
 storageDate.setMonth(today.getMonth() + 6);
 
 // モックデータ
-const mockStocks: Stock[] = [
-  {
-    id: 1,
-    product_name: 'テスト製品A',
-    lot: 'LOT20240301',
-    status: SampleStatus.STORED,
-    registration_date: new Date('2024-03-01'),
-    update_date: new Date('2024-03-01'),
-    remarks: 'テスト用サンプル',
-    expiration_date: expirationDate,
-    storage_date: storageDate,
-    current_weight: new Decimal(100.5),
-    net_weight: new Decimal(95.2),
-    vessel_weight: new Decimal(5.3),
-    inbound_weight: new Decimal(100.5),
-    material_id: 1,
-    material: {
-      id: 1,
-      name: 'テスト資材A',
-      specification: '規格A',
-      category_id: 1,
-      category: {
-        id: 1,
-        name: '原料',
-        created_at: new Date(),
-        updated_at: new Date()
-      },
-      created_at: new Date(),
-      updated_at: new Date()
-    },
-    vessel_id: 1,
-    vessel: {
-      id: 1,
-      name: 'ガラス容器A',
-      weight: new Decimal(5.3),
-      created_at: new Date(),
-      updated_at: new Date()
-    },
-    creator_id: 1,
-    creator: {
-      id: 1,
-      username: 'testuser',
-      email: 'test@example.com',
-      created_at: new Date(),
-      updated_at: new Date()
-    },
-    created_at: new Date(),
-    updated_at: new Date()
-  },
-  {
-    id: 2,
-    product_name: 'テスト製品B',
-    lot: 'LOT20240302',
-    status: SampleStatus.OUTBOUND,
-    registration_date: new Date('2024-03-02'),
-    update_date: new Date('2024-03-03'),
-    remarks: 'テスト用サンプル2',
-    expiration_date: expirationDate,
-    storage_date: storageDate,
-    current_weight: new Decimal(0),
-    net_weight: new Decimal(75.8),
-    vessel_weight: new Decimal(4.2),
-    inbound_weight: new Decimal(80.0),
-    material_id: 2,
-    material: {
-      id: 2,
-      name: 'テスト資材B',
-      specification: '規格B',
-      category_id: 2,
-      category: {
-        id: 2,
-        name: '中間品',
-        created_at: new Date(),
-        updated_at: new Date()
-      },
-      created_at: new Date(),
-      updated_at: new Date()
-    },
-    vessel_id: 2,
-    vessel: {
-      id: 2,
-      name: 'プラスチック容器A',
-      weight: new Decimal(4.2),
-      created_at: new Date(),
-      updated_at: new Date()
-    },
-    creator_id: 1,
-    creator: {
-      id: 1,
-      username: 'testuser',
-      email: 'test@example.com',
-      created_at: new Date(),
-      updated_at: new Date()
-    },
-    created_at: new Date(),
-    updated_at: new Date()
-  }
-];
+// const mockStocks: Stock[] = [
+//   {
+//     id: 1,
+//     productName: 'テスト製品A',
+//     lot: 'LOT20240301',
+//     status: SampleStatus.STORED,
+//     registrationDate: new Date('2024-03-01'),
+//     updateDate: new Date('2024-03-01'),
+//     remarks: 'テスト用サンプル',
+//     expirationDate: expirationDate,
+//     storageDate: storageDate,
+//     currentWeight: new Decimal(100.5),
+//     netWeight: new Decimal(95.2),
+//     vesselWeight: new Decimal(5.3),
+//     inboundWeight: new Decimal(100.5),
+//     materialId: 1,
+//     material: {
+//       id: 1,
+//       name: 'テスト資材A',
+//       specification: '規格A',
+//       categoryId: 1,
+//       supplierId: 1,
+//       manufacturerId: 1,
+//       category: {
+//         id: 1,
+//         name: '原料',
+//         createdAt: new Date(),
+//         updatedAt: new Date()
+//       },
+//       createdAt: new Date(),
+//       updatedAt: new Date()
+//     },
+//     vesselId: 1,
+//     vessel: {
+//       id: 1,
+//       name: 'ガラス容器A',
+//       weight: new Decimal(5.3),
+//       createdAt: new Date(),
+//       updatedAt: new Date()
+//     },
+//     creatorId: 1,
+//     creator: {
+//       id: 1,
+//       username: 'testuser',
+//       email: 'test@example.com',
+//       createdAt: new Date(),
+//       updatedAt: new Date()
+//     },
+//     createdAt: new Date(),
+//     updatedAt: new Date()
+//   },
+//   {
+//     id: 2,
+//     productName: 'テスト製品B',
+//     lot: 'LOT20240302',
+//     status: SampleStatus.OUTBOUND,
+//     registrationDate: new Date('2024-03-02'),
+//     updateDate: new Date('2024-03-03'),
+//     remarks: 'テスト用サンプル2',
+//     expirationDate: expirationDate,
+//     storageDate: storageDate,
+//     currentWeight: new Decimal(0),
+//     netWeight: new Decimal(75.8),
+//     vesselWeight: new Decimal(4.2),
+//     inboundWeight: new Decimal(80.0),
+//     materialId: 2,
+//     material: {
+//       id: 2,
+//       name: 'テスト資材B',
+//       specification: '規格B',
+//       categoryId: 2,
+//       supplierId: 2,
+//       manufacturerId: 2,
+//       category: {
+//         id: 2,
+//         name: '中間品',
+//         createdAt: new Date(),
+//         updatedAt: new Date()
+//       },
+//       createdAt: new Date(),
+//       updatedAt: new Date()
+//     },
+//     vesselId: 2,
+//     vessel: {
+//       id: 2,
+//       name: 'プラスチック容器A',
+//       weight: new Decimal(4.2),
+//       createdAt: new Date(),
+//       updatedAt: new Date()
+//     },
+//     creatorId: 1,
+//     creator: {
+//       id: 1,
+//       username: 'testuser',
+//       email: 'test@example.com',
+//       createdAt: new Date(),
+//       updatedAt: new Date()
+//     },
+//     createdAt: new Date(),
+//     updatedAt: new Date()
+//   }
+// ];
 
 interface StockState {
   stocks: Stock[];
   loading: boolean;
   error: string | null;
-  selected_stock: Stock | null;
+  selectedStock: Stock | null;
   fetchStocks: () => Promise<void>;
-  addStock: (stock: Omit<Stock, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  addStock: (stock: Omit<Stock, 'id' | 'createdAt' | 'updatedAt'>) => Promise<any>;
   updateStock: (id: number, stockData: Partial<Stock>) => Promise<void>;
   deleteStock: (id: number) => Promise<void>;
   selectStock: (stock: Stock | null) => void;
@@ -124,40 +129,121 @@ interface StockState {
   reInboundStock: (id: number, returnedWeight: Decimal) => Promise<void>;
 }
 
+// スネークケースからキャメルケースへの変換ヘルパー関数
+const snakeToCamel = (obj: Record<string, any>): Record<string, any> => {
+  const result: Record<string, any> = {};
+  for (const key in obj) {
+    const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+    result[camelKey] = obj[key];
+  }
+  return result;
+};
+
 export const useStockStore = create<StockState>((set, get) => ({
-  stocks: mockStocks,
+  stocks: [],
   loading: false,
   error: null,
-  selected_stock: null,
+  selectedStock: null,
 
   fetchStocks: async () => {
-    set({ loading: true, error: null });
-    try {
-      // 実際のAPIコールはここに実装
-      // 現在はモックデータを使用
-      set({ stocks: mockStocks, loading: false });
-    } catch (error) {
-      set({ error: (error as Error).message, loading: false });
-    }
+    await apiRequest({
+      endpoint: '/stocks',
+      errorMessage: '在庫データの取得に失敗しました',
+      logPrefix: '在庫データ取得',
+      transformResponse: (data: any) => {
+        console.log('APIレスポンス:', data); // 実際のデータ構造を確認
+        
+        // 在庫データの変換処理
+        const stocks = data.stocks.map((stock: any) => {
+          // フラット構造のデータに変換
+          return {
+            id: stock.id,
+            productName: stock.productName,
+            lot: stock.lot,
+            status: stock.status,
+            categoryName: stock.categoryName,
+            vesselName: stock.vesselName,
+            registrationDate: new Date(stock.registrationDate),
+            updateDate: new Date(stock.updateDate),
+            remarks: stock.remarks,
+            expirationDate: new Date(stock.expirationDate),
+            storageDate: new Date(stock.storageDate),
+            currentWeight: new Decimal(stock.currentWeight),
+            netWeight: new Decimal(stock.netWeight),
+            vesselWeight: new Decimal(stock.vesselWeight),
+            inboundWeight: new Decimal(stock.inboundWeight),
+            // ネストされたオブジェクトのプロパティをフラット化
+            materialId: stock.materialId,
+            materialName: stock.material?.name,
+            materialSpecification: stock.material?.specification,
+            materialCategoryId: stock.material?.categoryId,
+            materialCategoryName: stock.material?.category?.name,
+            vesselId: stock.vesselId,
+            // ここで重複していたvesselWeightを削除
+            // creatorId: stock.creatorId,
+            // creatorUsername: stock.creator?.username,
+            // creatorEmail: stock.creator?.email,
+            extraConfig: stock.extraConfig,
+            parentStockId: stock.parentStockId,
+            // 日付型への変換
+            createdAt: new Date(stock.createdAt),
+            updatedAt: new Date(stock.updatedAt)
+          };
+        });
+        return { stocks };
+      },
+      onSuccess: (data, set) => set({
+        stocks: data.stocks,
+        loading: false
+      })
+    }, set);
   },
 
   addStock: async (stock) => {
     set({ loading: true, error: null });
-    try {
-      // 実際のAPIコールはここに実装
-      const newStock: Stock = {
-        ...stock,
-        id: Math.max(0, ...get().stocks.map(s => s.id)) + 1,
-        created_at: new Date(),
-        updated_at: new Date()
-      };
-      set(state => ({ 
-        stocks: [...state.stocks, newStock], 
-        loading: false 
-      }));
-    } catch (error) {
-      set({ error: (error as Error).message, loading: false });
-    }
+    return await apiRequest({
+      endpoint: '/stocks',
+      method: 'POST',
+      data: stock,
+      errorMessage: '在庫の登録に失敗しました',
+      logPrefix: '在庫登録',
+      transformResponse: (data: any) => {
+        // APIレスポンスの変換処理
+        const stock = {
+          id: data.id,
+          productName: data.productName,
+          lot: data.lot,
+          status: data.status,
+          registrationDate: new Date(data.registrationDate),
+          updateDate: new Date(data.updateDate),
+          remarks: data.remarks,
+          expirationDate: new Date(data.expirationDate),
+          storageDate: new Date(data.storageDate),
+          currentWeight: new Decimal(data.currentWeight),
+          netWeight: new Decimal(data.netWeight),
+          vesselWeight: new Decimal(data.vesselWeight),
+          inboundWeight: new Decimal(data.inboundWeight),
+          materialId: data.materialId,
+          materialName: data.materialName,
+          materialSpecification: data.materialSpecification,
+          materialCategoryId: data.materialCategoryId,
+          materialCategoryName: data.materialCategoryName,
+          vesselId: data.vesselId,
+          vesselName: data.vesselName,
+          creatorId: data.creatorId,
+          creatorUsername: data.creatorUsername,
+          extraConfig: data.extraConfig,
+          parentStockId: data.parentStockId,
+          createdAt: new Date(data.createdAt),
+          updatedAt: new Date(data.updatedAt)
+        };
+        return stock;
+      },
+      onSuccess: (newStock, set) => set((state: StockState) => ({
+        stocks: [...state.stocks, newStock],
+        loading: false
+      }))
+    }, set);
   },
 
   updateStock: async (id, stockData) => {
@@ -167,7 +253,7 @@ export const useStockStore = create<StockState>((set, get) => ({
       set(state => ({
         stocks: state.stocks.map(stock => 
           stock.id === id 
-            ? { ...stock, ...stockData, updated_at: new Date() } 
+            ? { ...stock, ...stockData, updatedAt: new Date() } 
             : stock
         ),
         loading: false
@@ -191,7 +277,7 @@ export const useStockStore = create<StockState>((set, get) => ({
   },
 
   selectStock: (stock) => {
-    set({ selected_stock: stock });
+    set({ selectedStock: stock });
   },
 
   issueStock: async (id, issuedWeight) => {
@@ -202,16 +288,16 @@ export const useStockStore = create<StockState>((set, get) => ({
         throw new Error('在庫が見つかりません');
       }
 
-      if (stock.current_weight.lessThan(issuedWeight)) {
+      if (stock.currentWeight.lessThan(issuedWeight)) {
         throw new Error('出庫量が現在の重量を超えています');
       }
 
       const updatedStock = {
         ...stock,
         status: SampleStatus.OUTBOUND,
-        current_weight: new Decimal(0), // 出庫中は0に
-        update_date: new Date(),
-        updated_at: new Date()
+        currentWeight: new Decimal(0), // 出庫中は0に
+        updateDate: new Date(),
+        updatedAt: new Date()
       };
 
       set(state => ({
@@ -239,9 +325,9 @@ export const useStockStore = create<StockState>((set, get) => ({
       const updatedStock = {
         ...stock,
         status: SampleStatus.REINBOUND,
-        current_weight: returnedWeight,
-        update_date: new Date(),
-        updated_at: new Date()
+        currentWeight: returnedWeight,
+        updateDate: new Date(),
+        updatedAt: new Date()
       };
 
       set(state => ({

@@ -206,9 +206,7 @@ export default function Reinbound() {
   ];
   
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">再入庫処理</h1>
-      
+    <div className="space-y-6">      
       {(stockError || weightError) && (
         <div ref={errorRef} className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative dark:bg-red-900 dark:text-red-100 dark:border-red-700" role="alert">
           <span className="block sm:inline">{stockError || weightError}</span>

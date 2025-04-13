@@ -21,6 +21,8 @@ model Stock {
   materialId        Int         @map("material_id")
   material          Material    @relation(fields: [materialId], references: [id])
   
+  vesselId          Int         @map("vessel_id")
+
   creatorId         Int         @map("creator_id")
   creator           User        @relation("CreatorStocks", fields: [creatorId], references: [id])
   

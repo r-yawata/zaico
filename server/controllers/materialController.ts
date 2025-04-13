@@ -9,7 +9,9 @@ import {
   generateDeleteQuery, 
   generateSelectByIdQuery,
   generateSelectAllQuery,
-  executeQuery
+  executeQuery,
+  transformToCamelCase, 
+  transformToSnakeCase
 } from '../utils/sqlUtils';
 
 // PostgreSQLの接続設定
@@ -29,31 +31,33 @@ interface IdParam {
   id: string;
 }
 
+
+// 資材データのみを取得するクエリ
+const materialsQuery = `
+  SELECT 
+    m.id, m.name, m.specification, m.custom_attributes, m.package_count, m.unit_weight, 
+    m.note, m.supplier_id, m.manufacturer_id, m.category_id, m.vessel_id, m.created_at, m.updated_at,
+    m.enable_lot_control, m.enable_weight_control,
+    s.name AS supplier_name, mf.name AS manufacturer_name, c.name AS category_name, v.name AS vessel_name
+  FROM 
+    "Material" m
+  LEFT JOIN
+    "Supplier" s ON m.supplier_id = s.id
+  LEFT JOIN
+    "Manufacturer" mf ON m.manufacturer_id = mf.id
+  LEFT JOIN
+    "Category" c ON m.category_id = c.id
+  LEFT JOIN
+    "Vessel" v ON m.vessel_id = v.id`;
+
 export default function materialRoutes(fastify: FastifyInstance, opts: any, done: () => void) {
   // 全資材取得 API
   fastify.get('/', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       console.log('Fetching materials...');
+  
       
-      // 1. 資材データのみを取得するクエリ
-      const materialsQuery = `
-        SELECT 
-          m.id, m.name, m.specification, m.custom_attributes, m.package_count, m.unit_weight, 
-          m.note, m.supplier_id, m.manufacturer_id, m.category_id, m.created_at, m.updated_at,
-          s.name AS supplier_name, mf.name AS manufacturer_name, c.name AS category_name
-        FROM 
-          "Material" m
-        LEFT JOIN
-          "Supplier" s ON m.supplier_id = s.id
-        LEFT JOIN
-          "Manufacturer" mf ON m.manufacturer_id = mf.id
-        LEFT JOIN
-          "Category" c ON m.category_id = c.id
-        ORDER BY 
-          m.id
-      `;
-      
-      // 2. 関連データを取得するクエリ
+      // 関連データを取得するクエリ
       const relatedDataQuery = `
         SELECT 
           s.id AS id,
@@ -61,7 +65,7 @@ export default function materialRoutes(fastify: FastifyInstance, opts: any, done
           NULL AS location,
           NULL AS description,
           'supplier' AS data_type
-        FROM "Supplier" s
+        FROM "Supplier" s WHERE s.enabled = true
 
         UNION ALL
 
@@ -71,7 +75,7 @@ export default function materialRoutes(fastify: FastifyInstance, opts: any, done
           m.location AS location,
           NULL AS description,
           'manufacturer' AS data_type
-        FROM "Manufacturer" m
+        FROM "Manufacturer" m WHERE m.enabled = true
 
         UNION ALL
 
@@ -81,7 +85,17 @@ export default function materialRoutes(fastify: FastifyInstance, opts: any, done
           NULL AS location,
           c.description AS description,
           'category' AS data_type
-        FROM "Category" c;
+        FROM "Category" c WHERE c.enabled = true
+        
+        UNION ALL
+        
+        SELECT 
+          v.id AS id,
+          v.name AS name,
+          NULL AS location,
+          NULL AS description,
+          'vessel' AS data_type
+        FROM "Vessel" v WHERE v.enabled = true;
       `;
       
       // クエリを並行して実行
@@ -97,6 +111,7 @@ export default function materialRoutes(fastify: FastifyInstance, opts: any, done
       const suppliers: any[] = [];
       const manufacturers: any[] = [];
       const categories: any[] = [];
+      const vessels: any[] = [];
       
       // 関連データを直接配列に格納
       relatedDataResult.rows.forEach(row => {
@@ -120,6 +135,11 @@ export default function materialRoutes(fastify: FastifyInstance, opts: any, done
             name: row.name,
             description: row.description
           });
+        } else if (row.data_type === 'vessel') {
+          vessels.push({
+            id: row.id,
+            name: row.name
+          });
         }
       });
 
@@ -128,7 +148,8 @@ export default function materialRoutes(fastify: FastifyInstance, opts: any, done
         materials,
         suppliers,
         manufacturers,
-        categories
+        categories,
+        vessels
       });
     } catch (error) {
       fastify.log.error(error);
@@ -145,9 +166,10 @@ export default function materialRoutes(fastify: FastifyInstance, opts: any, done
       // トランザクション開始
       await client.query('BEGIN');
       
-      // リクエストボディのバリデーション
-      console.log('Request body:', request.body); // デバッグ用にリクエストボディを出力
+      // リクエストボディのデバッグ出力
+      console.log('Request body:', request.body);
       
+      // バリデーション
       const validation = createMaterialSchema.safeParse(request.body);
       
       if (!validation.success) {
@@ -159,10 +181,13 @@ export default function materialRoutes(fastify: FastifyInstance, opts: any, done
       }
       
       const materialData = validation.data;
-      console.log('Validated data:', materialData); // バリデーション後のデータを出力
+      console.log('Validated data:', materialData);
       
-      // SQLユーティリティを使用してクエリを生成
-      const { query, values } = generateInsertQuery('Material', materialData);
+      // バリデーション済みデータをスネークケースに変換（DB操作のため）
+      const snakeCaseData = transformToSnakeCase(materialData);
+      
+      // SQLユーティリティを使用してクエリを生成（スネークケースのデータを使用）
+      const { query, values } = generateInsertQuery('Material', snakeCaseData);
       
       // クエリを実行（トランザクション内で）
       const result = await client.query(query, values);
@@ -185,8 +210,11 @@ export default function materialRoutes(fastify: FastifyInstance, opts: any, done
       
       // トランザクションをコミット
       await client.query('COMMIT');
-            
-      reply.code(201).send(newMaterial);
+         
+      const materialResult = await client.query(materialsQuery.slice(0, -1) + ` WHERE m.id = ${newMaterial.id}`);
+      const newMaterialWithRelated = materialResult.rows[0];
+
+      reply.code(201).send(newMaterialWithRelated);
     } catch (error) {
       // エラー発生時はロールバック
       await client.query('ROLLBACK');
@@ -220,6 +248,9 @@ export default function materialRoutes(fastify: FastifyInstance, opts: any, done
       
       const materialData = validation.data;
       
+      // バリデーション済みデータをスネークケースに変換（DB操作のため）
+      const snakeCaseData = transformToSnakeCase(materialData);
+      
       // 既存の資材を確認
       const checkQuery = generateSelectByIdQuery('Material', 'id', id).query;
       const checkResult = await client.query(checkQuery, [id]);
@@ -239,7 +270,7 @@ export default function materialRoutes(fastify: FastifyInstance, opts: any, done
       }
       
       // SQLユーティリティを使用して更新クエリを生成
-      const { query, values } = generateUpdateQuery('Material', materialData, 'id', id);
+      const { query, values } = generateUpdateQuery('Material', snakeCaseData, 'id', id);
       
       // クエリを実行（トランザクション内で）
       const result = await client.query(query, values);
@@ -266,12 +297,11 @@ export default function materialRoutes(fastify: FastifyInstance, opts: any, done
       // トランザクションをコミット
       await client.query('COMMIT');
       
-      // 結果を整形
-      const materialWithRelated = {
-        ...updatedMaterial,
-      };
+      // JOINされた最新データを取得
+      const materialResult = await client.query(materialsQuery.slice(0, -1) + ` WHERE m.id = ${id}`);
+      const updatedMaterialWithRelated = materialResult.rows[0];
       
-      reply.code(200).send(materialWithRelated);
+      reply.code(200).send(updatedMaterialWithRelated);
     } catch (error) {
       // エラー発生時はロールバック
       await client.query('ROLLBACK');

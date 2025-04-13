@@ -17,8 +17,8 @@ export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
 // レスポンススキーマ
 export const categorySchema = categoryBaseSchema.extend({
   id: z.number(),
-  created_at: z.date(),
-  updated_at: z.date(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 export type Category = z.infer<typeof categorySchema>;
 // 後方互換性のために残します

@@ -1,24 +1,42 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { Decimal } from 'decimal.js';
 import { useMasterStore } from '../../stores/masterStore';
 import { useStockStore } from '../../stores/stockStore';
-import type { Material, Vessel } from '../../types';
 import { SampleStatus } from '../../types';
+import { useNavigationStore } from '../../stores/navigationStore';
+import FormGenerator, { type FormFieldConfig as BaseFormFieldConfig, type FormData } from '../../components/ui/FormGenerator';
+import { Button } from '../../components/ui/button';
+import Stepper from '../../components/ui/stepIndicator';
+
+// 拡張したFormFieldConfigインターフェース
+interface ExtendedFormFieldConfig extends BaseFormFieldConfig {
+  showOnLabel?: boolean;
+  displayFn?: (value: string) => string;
+}
 
 export default function Inbound() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
+  const stockId = searchParams.get('stockId');
+  const mode = searchParams.get('mode');
+  
   const { materials, vessels, fetchMaterials, fetchVessels } = useMasterStore();
   const { addStock, loading, error } = useStockStore();
   const [isLoading, setIsLoading] = useState(true);
   const [step, setStep] = useState<'input' | 'weighing' | 'label' | 'reweighing' | 'complete'>('input');
   
   // フォーム状態
-  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
-  const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
-  const [lot, setLot] = useState('');
-  const [purpose, setPurpose] = useState('');
-  const [expirationDate, setExpirationDate] = useState('');
-  const [storageDate, setStorageDate] = useState('');
-  const [remarks, setRemarks] = useState('');
+  const [formData, setFormData] = useState({
+    materialId: '',
+    lot: '',
+    purpose: '',
+    expirationDate: '',
+    storageDate: '',
+    remarks: '',
+    quantity: '1' // 数量フィールドの追加（デフォルトは1）
+  });
   
   // 重量関連
   const [vesselWeight, setVesselWeight] = useState<Decimal>(new Decimal(0));
@@ -28,7 +46,52 @@ export default function Inbound() {
   // 模擬的な秤の読み取り
   const [simulatedWeight, setSimulatedWeight] = useState<Decimal>(new Decimal(0));
   
+  // 登録中フラグ
+  const [isRegistering, setIsRegistering] = useState(false);
+  
+  const { setPageTitle, setBackButton } = useNavigationStore();
+
+  // URLパラメータから初期データを設定（再入庫モードの場合）
   useEffect(() => {
+    if (stockId && mode === 'reinbound') {
+      const loadSpecificStock = async () => {
+        try {
+          const response = await fetch(`/api/stocks/${stockId}`);
+          if (response.ok) {
+            const stock = await response.json();
+            if (stock && stock.status === SampleStatus.OUTBOUND) {
+              // 再入庫モードの場合の処理
+              setFormData(prev => ({
+                ...prev,
+                materialId: String(stock.materialId),
+                lot: stock.lot,
+                purpose: stock.extraConfig?.purpose || '',
+                // その他必要なデータをセット
+              }));
+              
+              // 再入庫モードではweighingステップから始める
+              setStep('weighing');
+            }
+          }
+        } catch (error) {
+          console.error('在庫データ取得エラー:', error);
+        }
+      };
+      
+      loadSpecificStock();
+    }
+  }, [stockId, mode]);
+
+  useEffect(() => {
+    setPageTitle('入庫処理');
+    
+    // 在庫画面から来た場合は、戻るボタンで在庫画面に戻れるようにする
+    if (returnTo === 'inventory') {
+      setBackButton(true, () => navigate('/inventory'));
+    } else {
+      setBackButton(true, resetForm);
+    }
+
     const loadData = async () => {
       setIsLoading(true);
       await Promise.all([fetchMaterials(), fetchVessels()]);
@@ -36,16 +99,26 @@ export default function Inbound() {
     };
     
     loadData();
-  }, [fetchMaterials, fetchVessels]);
+  }, [fetchMaterials, fetchVessels, returnTo, navigate, setBackButton, setPageTitle]);
   
-  // 容器選択時に重量を設定
+  // 日付のデフォルト値を設定
   useEffect(() => {
-    if (selectedVessel) {
-      setVesselWeight(selectedVessel.weight);
-    } else {
-      setVesselWeight(new Decimal(0));
-    }
-  }, [selectedVessel]);
+    const today = new Date();
+    
+    // 有効期限のデフォルト（1年後）
+    const nextYear = new Date(today);
+    nextYear.setFullYear(today.getFullYear() + 1);
+    
+    // 保管期限のデフォルト（6ヶ月後）
+    const sixMonthsLater = new Date(today);
+    sixMonthsLater.setMonth(today.getMonth() + 6);
+    
+    setFormData(prev => ({
+      ...prev,
+      expirationDate: nextYear.toISOString().split('T')[0],
+      storageDate: sixMonthsLater.toISOString().split('T')[0]
+    }));
+  }, []);
   
   // 模擬的な秤の読み取り（実際の実装では秤からのデータを取得）
   const readScale = () => {
@@ -66,101 +139,313 @@ export default function Inbound() {
     setStep('label');
   };
   
-  const handleFinalWeighing = () => {
+  const handleFinalWeighing = async () => {
     const weight = handleWeigh();
     setFinalWeight(weight);
-    setStep('complete');
+    
+    // 完了ステップをスキップして直接登録処理
+    if (isRegistering) return;
+    setIsRegistering(true);
+    
+    try {
+      const materialId = Number(formData.materialId);
+      const material = materials.find(m => m.id === materialId);
+      if (!material) {
+        setIsRegistering(false);
+        return;
+      }
+      
+      // 資材に紐づく容器を取得
+      const vessel = material.vesselId ? vessels.find(v => v.id === material.vesselId) : null;
+      
+      // 正味重量の計算（最終重量 - 容器重量）
+      const netWeight = weight.minus(vesselWeight);
+      
+      // 数量を取得
+      const quantity = parseInt(formData.quantity || '1', 10);
+      
+      // 登録処理の配列
+      const registrationPromises = [];
+      
+      // 指定された数量分、在庫データを作成して登録
+      for (let i = 0; i < quantity; i++) {
+        // 在庫データの作成 - フラット構造で作成
+        const stockData = {
+          productName: material.name,
+          lot: formData.lot,
+          status: SampleStatus.STORED,
+          registrationDate: new Date(),
+          updateDate: new Date(),
+          remarks: formData.remarks,
+          expirationDate: new Date(formData.expirationDate),
+          storageDate: new Date(formData.storageDate),
+          currentWeight: weight,
+          netWeight,
+          vesselWeight,
+          inboundWeight: weight,
+          materialId: material.id,
+          materialName: material.name,
+          materialSpecification: material.specification,
+          materialCategoryId: material.categoryId,
+          materialCategoryName: material.categoryName || '',
+          vesselId: vessel?.id || 0, // nullableな場合に0をデフォルト値として設定
+          vesselName: vessel?.name,
+          creatorId: 2, // 仮のユーザーID
+          creatorUsername: 'testuser',
+          extraConfig: { purpose: formData.purpose }
+        };
+        
+        // addStock関数を使用して登録
+        registrationPromises.push(addStock(stockData));
+      }
+      
+      // すべての在庫を登録
+      await Promise.all(registrationPromises);
+      
+      // 成功メッセージ
+      alert('入庫処理が完了しました');
+      
+      // 成功時の処理
+      if (returnTo === 'inventory') {
+        // 在庫画面から来た場合は、処理完了後に在庫画面に戻る
+        navigate('/inventory');
+      } else {
+        resetForm();
+      }
+    } catch (error) {
+      console.error('在庫登録エラー:', error);
+      alert('入庫処理中にエラーが発生しました');
+    } finally {
+      setIsRegistering(false);
+    }
   };
   
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
     
-    if (!selectedMaterial || !lot || !expirationDate || !storageDate) {
+    // 資材選択時に対応する容器の重量を設定
+    if (field === 'materialId') {
+      const materialId = Number(value);
+      const material = materials.find(m => m.id === materialId);
+      if (material && material.vesselId) {
+        const vessel = vessels.find(v => v.id === material.vesselId);
+        if (vessel && vessel.weight !== undefined) {
+          // vessel.weightが存在することを確認し、安全に変換
+          try {
+            setVesselWeight(new Decimal(String(vessel.weight)));
+          } catch (e) {
+            console.error('容器重量の変換エラー:', e);
+            setVesselWeight(new Decimal(0));
+          }
+        } else {
+          setVesselWeight(new Decimal(0));
+        }
+      } else {
+        setVesselWeight(new Decimal(0));
+      }
+    }
+  };
+  
+  const handleFormSubmit = (data: FormData) => {
+    // 数量の値が無効な場合はエラー表示
+    const quantity = parseInt(data.quantity as string || '0', 10);
+    if (isNaN(quantity) || quantity <= 0) {
+      alert('数量は1以上の数値を入力してください');
+      return;
+    }
+    
+    if (!data.materialId || !data.lot || !data.expirationDate || !data.storageDate) {
       alert('必須項目を入力してください');
       return;
     }
     
-    setStep('weighing');
+    // weightingをスキップして直接labelへ
+    setStep('label');
   };
   
   const handleComplete = async () => {
-    if (!selectedMaterial) return;
-    
-    // 正味重量の計算（最終重量 - 容器重量）
-    const netWeight = finalWeight.minus(vesselWeight);
-    
-    // 在庫データの作成
-    const stockData = {
-      productName: selectedMaterial.name,
-      lot,
-      status: SampleStatus.STORED,
-      registrationDate: new Date(),
-      updateDate: new Date(),
-      remarks,
-      expirationDate: new Date(expirationDate),
-      storageDate: new Date(storageDate),
-      currentWeight: finalWeight,
-      netWeight,
-      vesselWeight,
-      inboundWeight: finalWeight,
-      materialId: selectedMaterial.id,
-      material: selectedMaterial,
-      vesselId: selectedVessel?.id,
-      vessel: selectedVessel || undefined,
-      creatorId: 1, // 仮のユーザーID
-      creator: {
-        id: 1,
-        username: 'testuser',
-        email: 'test@example.com',
-        created_at: new Date(),
-        updated_at: new Date()
-      },
-      extraConfig: { purpose }
-    };
+    if (isRegistering) return;
+    setIsRegistering(true);
     
     try {
-      await addStock(stockData);
-      // 成功時の処理（例：フォームのリセット）
-      resetForm();
+      const materialId = Number(formData.materialId);
+      const material = materials.find(m => m.id === materialId);
+      if (!material) {
+        setIsRegistering(false);
+        return;
+      }
+      
+      // 資材に紐づく容器を取得
+      const vessel = material.vesselId ? vessels.find(v => v.id === material.vesselId) : null;
+      
+      // 正味重量の計算（最終重量 - 容器重量）
+      const netWeight = finalWeight.minus(vesselWeight);
+      
+      // 数量を取得
+      const quantity = parseInt(formData.quantity || '1', 10);
+      
+      // 登録処理の配列
+      const registrationPromises = [];
+      
+      // 指定された数量分、在庫データを作成して登録
+      for (let i = 0; i < quantity; i++) {
+        // 在庫データの作成 - フラット構造で作成
+        const stockData = {
+          productName: material.name,
+          lot: formData.lot,
+          status: SampleStatus.STORED,
+          registrationDate: new Date(),
+          updateDate: new Date(),
+          remarks: formData.remarks,
+          expirationDate: new Date(formData.expirationDate),
+          storageDate: new Date(formData.storageDate),
+          currentWeight: finalWeight,
+          netWeight,
+          vesselWeight,
+          inboundWeight: finalWeight,
+          materialId: material.id,
+          materialName: material.name,
+          materialSpecification: material.specification,
+          materialCategoryId: material.categoryId,
+          materialCategoryName: material.categoryName || '',
+          vesselId: vessel?.id || 0, // nullableな場合に0をデフォルト値として設定
+          vesselName: vessel?.name,
+          creatorId: 2, // 仮のユーザーID
+          creatorUsername: 'testuser',
+          extraConfig: { purpose: formData.purpose }
+        };
+        
+        // addStock関数を使用して登録
+        registrationPromises.push(addStock(stockData));
+      }
+      
+      // すべての在庫を登録
+      await Promise.all(registrationPromises);
+      
+      // 成功時の処理
+      if (returnTo === 'inventory') {
+        // 在庫画面から来た場合は、処理完了後に在庫画面に戻る
+        navigate('/inventory');
+      } else {
+        resetForm();
+      }
     } catch (error) {
       console.error('在庫登録エラー:', error);
+    } finally {
+      setIsRegistering(false);
     }
   };
   
   const resetForm = () => {
-    setSelectedMaterial(null);
-    setSelectedVessel(null);
-    setLot('');
-    setPurpose('');
-    setExpirationDate('');
-    setStorageDate('');
-    setRemarks('');
-    setVesselWeight(new Decimal(0));
-    setInitialWeight(new Decimal(0));
-    setFinalWeight(new Decimal(0));
-    setSimulatedWeight(new Decimal(0));
-    setStep('input');
-  };
-  
-  // 日付のデフォルト値を設定
-  useEffect(() => {
+    setFormData({
+      materialId: '',
+      lot: '',
+      purpose: '',
+      expirationDate: '',
+      storageDate: '',
+      remarks: '',
+      quantity: '1'
+    });
+    
+    // 日付のデフォルト値を再設定
     const today = new Date();
     
     // 有効期限のデフォルト（1年後）
     const nextYear = new Date(today);
     nextYear.setFullYear(today.getFullYear() + 1);
-    setExpirationDate(nextYear.toISOString().split('T')[0]);
     
     // 保管期限のデフォルト（6ヶ月後）
     const sixMonthsLater = new Date(today);
     sixMonthsLater.setMonth(today.getMonth() + 6);
-    setStorageDate(sixMonthsLater.toISOString().split('T')[0]);
-  }, []);
+    
+    setFormData(prev => ({
+      ...prev,
+      expirationDate: nextYear.toISOString().split('T')[0],
+      storageDate: sixMonthsLater.toISOString().split('T')[0]
+    }));
+    
+    // 重量関連の状態をリセット
+    setVesselWeight(new Decimal(0));
+    setInitialWeight(new Decimal(0));
+    setFinalWeight(new Decimal(0));
+    setSimulatedWeight(new Decimal(0));
+    
+    // ステップを初期状態に戻す
+    if (returnTo === 'inventory') {
+      // 在庫画面から来た場合は、処理完了後に在庫画面に戻る
+      navigate('/inventory');
+    } else {
+      setStep('input');
+    }
+    
+    // エラー状態もリセット
+    if (error) {
+      // エラー状態をリセットする方法がストアにあれば実行
+      // 例: resetError() などの関数があれば呼び出す
+    }
+  };
+  
+  // FormGeneratorのフィールド定義（拡張インターフェースを使用）
+  const getFormFields = (): ExtendedFormFieldConfig[] => [
+    {
+      id: 'materialId',
+      label: '資材',
+      elementType: 'select',
+      required: true,
+      showOnLabel: true,
+      displayFn: (value: string) => materials.find(m => m.id === Number(value))?.name || '',
+      options: materials.map(material => ({
+        label: `${material.name} ${material.specification ? `(${material.specification})` : ''}`,
+        value: String(material.id)
+      }))
+    },
+    {
+      id: 'lot',
+      label: 'ロット番号',
+      elementType: 'input',
+      required: true,
+      showOnLabel: true,
+    },
+    {
+      id: 'quantity',
+      label: '数量',
+      elementType: 'number',
+      required: true,
+      min: 1,
+      step: 1,
+      showOnLabel: true,
+    },
+    {
+      id: 'purpose',
+      label: '用途',
+      elementType: 'input',
+      showOnLabel: true,
+    },
+    {
+      id: 'expirationDate',
+      label: '有効期限',
+      elementType: 'date',
+      required: true,
+      showOnLabel: true,
+      displayFn: (value) => new Date(value).toLocaleDateString('ja-JP'),
+    },
+    {
+      id: 'storageDate',
+      label: '保管期限',
+      elementType: 'date',
+      required: true,
+      showOnLabel: true,
+    },
+    {
+      id: 'remarks',
+      label: '備考',
+      elementType: 'textarea',
+      showOnLabel: true,
+    }
+  ];
   
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">入庫処理</h1>
-      
+    <div className="space-y-6"> 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative dark:bg-red-900 dark:text-red-100 dark:border-red-700" role="alert">
           <span className="block sm:inline">{error}</span>
@@ -170,22 +455,39 @@ export default function Inbound() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
+            {/* <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
               {step === 'input' && '基本情報入力'}
               {step === 'weighing' && '初回計量'}
               {step === 'label' && 'ラベル印刷'}
               {step === 'reweighing' && '再計量'}
               {step === 'complete' && '入庫完了'}
-            </h2>
+            </h2> */}
             
             {/* ステップインジケーター */}
-            <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${step === 'input' ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-              <div className={`w-2 h-2 rounded-full ${step === 'weighing' ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-              <div className={`w-2 h-2 rounded-full ${step === 'label' ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-              <div className={`w-2 h-2 rounded-full ${step === 'reweighing' ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-              <div className={`w-2 h-2 rounded-full ${step === 'complete' ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-            </div>
+            <Stepper
+              steps={[
+                { title: "入力" },
+                { title: "ラベル印刷" },
+                { title: "計量" }
+              ]}
+              currentStep={
+                step === 'input' ? 0 :
+                step === 'label' ? 1 :
+                step === 'reweighing' ? 2 :
+                step === 'complete' ? 3 : 0
+              }
+              className="mb-4"
+              theme={{
+                active: 'bg-blue-500',
+                completed: 'bg-blue-500',
+                pending: 'bg-gray-300 dark:bg-gray-600',
+                textActive: 'text-white',
+                textCompleted: 'text-white',
+                textPending: 'text-gray-600 dark:text-gray-400',
+                connector: 'bg-gray-300 dark:bg-gray-600',
+                connectorCompleted: 'bg-blue-500',
+              }}
+            />
           </div>
           
           {isLoading || loading ? (
@@ -196,140 +498,24 @@ export default function Inbound() {
             <>
               {/* 基本情報入力フォーム */}
               {step === 'input' && (
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label htmlFor="material" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        資材 <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        id="material"
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        value={selectedMaterial?.id || ''}
-                        onChange={(e) => {
-                          const materialId = Number(e.target.value);
-                          const material = materials.find(m => m.id === materialId) || null;
-                          setSelectedMaterial(material);
-                        }}
-                        required
-                      >
-                        <option value="">選択してください</option>
-                        {materials.map((material) => (
-                          <option key={material.id} value={material.id}>
-                            {material.name} ({material.specification || '規格なし'})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="vessel" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        容器
-                      </label>
-                      <select
-                        id="vessel"
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        value={selectedVessel?.id || ''}
-                        onChange={(e) => {
-                          const vesselId = Number(e.target.value);
-                          const vessel = vessels.find(v => v.id === vesselId) || null;
-                          setSelectedVessel(vessel);
-                        }}
-                      >
-                        <option value="">選択してください</option>
-                        {vessels.map((vessel) => (
-                          <option key={vessel.id} value={vessel.id}>
-                            {vessel.name} ({vessel.weight.toString()}g)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="lot" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        ロット番号 <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        id="lot"
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        value={lot}
-                        onChange={(e) => setLot(e.target.value)}
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="purpose" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        用途
-                      </label>
-                      <input
-                        type="text"
-                        id="purpose"
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        value={purpose}
-                        onChange={(e) => setPurpose(e.target.value)}
-                      />
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="expirationDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        有効期限 <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        id="expirationDate"
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        value={expirationDate}
-                        onChange={(e) => setExpirationDate(e.target.value)}
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="storageDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        保管期限 <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        id="storageDate"
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        value={storageDate}
-                        onChange={(e) => setStorageDate(e.target.value)}
-                        required
-                      />
-                    </div>
-                    
-                    <div className="md:col-span-2">
-                      <label htmlFor="remarks" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        備考
-                      </label>
-                      <textarea
-                        id="remarks"
-                        rows={3}
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        value={remarks}
-                        onChange={(e) => setRemarks(e.target.value)}
-                      ></textarea>
-                    </div>
-                  </div>
+                <div className="max-w-2xl mx-auto">
+                  <FormGenerator
+                    fields={getFormFields()}
+                    initialData={formData}
+                    onSubmit={handleFormSubmit}
+                    onChange={handleChange}
+                  />
                   
-                  <div className="flex justify-end space-x-3">
-                    <button
-                      type="button"
-                      className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600"
-                      onClick={resetForm}
-                    >
-                      リセット
-                    </button>
-                    <button
+                  <div className="flex justify-center space-x-3 mt-6">
+                    <Button
                       type="submit"
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      onClick={() => handleFormSubmit(formData)}
                     >
                       次へ
-                    </button>
+                    </Button>
                   </div>
-                </form>
+                </div>
               )}
               
               {/* 初回計量 */}
@@ -342,17 +528,16 @@ export default function Inbound() {
                       <div className="text-center">
                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">現在の読み取り値</p>
                         <div className="text-4xl font-bold text-blue-600 dark:text-blue-400 font-mono">
-                          {simulatedWeight.toString()} g
+                          {simulatedWeight.toString() || '0'} g
                         </div>
                       </div>
                       
-                      <button
-                        type="button"
+                      <Button
                         className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                         onClick={handleInitialWeighing}
                       >
                         計量する
-                      </button>
+                      </Button>
                       
                       <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
                         <p>容器重量: {vesselWeight.toString()} g</p>
@@ -361,13 +546,13 @@ export default function Inbound() {
                   </div>
                   
                   <div className="flex justify-between">
-                    <button
-                      type="button"
-                      className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600"
+                    <Button
+                      className="text-black"
+                      variant="outline"
                       onClick={() => setStep('input')}
                     >
                       戻る
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -376,52 +561,51 @@ export default function Inbound() {
               {step === 'label' && (
                 <div className="space-y-6">
                   <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-lg">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">ラベル印刷</h3>
-                    
-                    <div className="border border-gray-200 dark:border-gray-700 p-4 rounded-lg mb-6">
-                      <div className="flex flex-col space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium">資材:</span>
-                          <span className="text-sm">{selectedMaterial?.name}</span>
+                    {         
+                        <div key={0} className="border border-gray-200 dark:border-gray-700 p-4 rounded-lg mb-6 w-1/2 mx-auto">
+                          <div className="flex flex-col space-y-2">
+                            {/* 自動フィールド表示 */}
+                            {getFormFields().filter(field => field.showOnLabel).map(field => (
+                              <div key={field.id} className="flex justify-between">
+                                <span className="text-sm font-medium">{field.label}:</span>
+                                <span className="text-sm">
+                                  {field.displayFn 
+                                    ? field.displayFn(formData[field.id as keyof typeof formData] as string)
+                                    : formData[field.id as keyof typeof formData]?.toString() || '-'}
+                                </span>
+                              </div>
+                            ))}
+                            
+                            {/* 特殊項目：初期重量 (フォームには含まれない) */}
+                            <div className="flex justify-between">
+                              <span className="text-sm font-medium">初期重量:</span>
+                              <span className="text-sm">{initialWeight.toString()} g</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium">ロット:</span>
-                          <span className="text-sm">{lot}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium">有効期限:</span>
-                          <span className="text-sm">{new Date(expirationDate).toLocaleDateString('ja-JP')}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium">初期重量:</span>
-                          <span className="text-sm">{initialWeight.toString()} g</span>
-                        </div>
-                      </div>
-                    </div>
+                    }
                     
                     <div className="flex justify-center">
-                      <button
-                        type="button"
+                      <Button
                         className="px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
                         onClick={() => {
-                          // 実際の実装ではラベル印刷処理を行う
                           alert('ラベルを印刷しました。ラベルを貼り付けた後、再計量を行ってください。');
                           setStep('reweighing');
                         }}
                       >
-                        ラベルを印刷
-                      </button>
+                        ラベル印刷
+                      </Button>
                     </div>
                   </div>
                   
                   <div className="flex justify-between">
-                    <button
-                      type="button"
-                      className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600"
+                    <Button
+                      className="text-black"
+                      variant="outline"
                       onClick={() => setStep('weighing')}
                     >
                       戻る
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -436,17 +620,17 @@ export default function Inbound() {
                       <div className="text-center">
                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">現在の読み取り値</p>
                         <div className="text-4xl font-bold text-blue-600 dark:text-blue-400 font-mono">
-                          {simulatedWeight.toString()} g
+                          {simulatedWeight.toString() || '0'} g
                         </div>
                       </div>
                       
-                      <button
-                        type="button"
+                      <Button
                         className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                         onClick={handleFinalWeighing}
+                        disabled={isRegistering}
                       >
-                        再計量する
-                      </button>
+                        {isRegistering ? '登録中...' : '入庫完了'}
+                      </Button>
                       
                       <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
                         <p>初回計量: {initialWeight.toString()} g</p>
@@ -456,18 +640,18 @@ export default function Inbound() {
                   </div>
                   
                   <div className="flex justify-between">
-                    <button
-                      type="button"
-                      className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600"
+                    <Button
+                      variant="outline"
                       onClick={() => setStep('label')}
                     >
                       戻る
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
               
               {/* 完了 */}
+              {/* 完了画面（将来的に使用する可能性があるためコメントアウト）
               {step === 'complete' && (
                 <div className="space-y-6">
                   <div className="bg-green-50 dark:bg-green-900 p-6 rounded-lg">
@@ -481,14 +665,17 @@ export default function Inbound() {
                     
                     <div className="border border-gray-200 dark:border-gray-700 p-4 rounded-lg mb-6">
                       <div className="flex flex-col space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium">資材:</span>
-                          <span className="text-sm">{selectedMaterial?.name}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium">ロット:</span>
-                          <span className="text-sm">{lot}</span>
-                        </div>
+                        {getFormFields().filter(field => field.showOnLabel || field.id === 'quantity').map(field => (
+                          <div key={field.id} className="flex justify-between">
+                            <span className="text-sm font-medium">{field.label}:</span>
+                            <span className="text-sm">
+                              {field.displayFn 
+                                ? field.displayFn(formData[field.id as keyof typeof formData] as string)
+                                : formData[field.id as keyof typeof formData]?.toString() || '-'}
+                            </span>
+                          </div>
+                        ))}
+                        
                         <div className="flex justify-between">
                           <span className="text-sm font-medium">最終重量:</span>
                           <span className="text-sm">{finalWeight.toString()} g</span>
@@ -501,17 +688,17 @@ export default function Inbound() {
                     </div>
                     
                     <div className="flex justify-center space-x-4">
-                      <button
-                        type="button"
+                      <Button
                         className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                         onClick={handleComplete}
+                        disabled={isRegistering}
                       >
-                        登録して完了
-                      </button>
+                        {isRegistering ? '登録中...' : '登録完了'}
+                      </Button>
                     </div>
                   </div>
                 </div>
-              )}
+              )} */}
             </>
           )}
         </div>

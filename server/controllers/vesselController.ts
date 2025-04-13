@@ -8,7 +8,9 @@ import {
   generateSelectByIdQuery,
   generateSelectAllQuery,
   executeQuery,
-  generateHistoryInsertQuery
+  generateHistoryInsertQuery,
+  transformToCamelCase,
+  transformToSnakeCase
 } from '../utils/sqlUtils';
 import { 
   createVesselSchema, 
@@ -104,12 +106,14 @@ export default function vesselRoutes(fastify: FastifyInstance, opts: any, done: 
       const vesselData = validationResult.data;
       console.log(`容器作成リクエスト: ${JSON.stringify(vesselData)}`);
       
+      // バリデーション済みデータをスネークケースに変換（DB操作のため）
+      const snakeCaseData = transformToSnakeCase(vesselData);
       
       // トランザクション開始
       await client.query('BEGIN');
       
       // SQLユーティリティを使用して挿入クエリを生成
-      const { query, values } = generateInsertQuery('Vessel', vesselData);
+      const { query, values } = generateInsertQuery('Vessel', snakeCaseData);
       
       // クエリを実行
       const result = await client.query(query, values);
@@ -165,6 +169,9 @@ export default function vesselRoutes(fastify: FastifyInstance, opts: any, done: 
       const updateData = validationResult.data;
       console.log(`容器更新リクエスト: ID=${id}, データ=${JSON.stringify(updateData)}`);
       
+      // バリデーション済みデータをスネークケースに変換（DB操作のため）
+      const snakeCaseData = transformToSnakeCase(updateData);
+      
       // 更新するフィールドがない場合
       if (Object.keys(updateData).length === 0) {
         return reply.code(400).send({ error: '更新するデータがありません' });
@@ -185,7 +192,7 @@ export default function vesselRoutes(fastify: FastifyInstance, opts: any, done: 
       const existingVessel = existingResult.rows[0];
       
       // SQLユーティリティを使用して更新クエリを生成
-      const { query, values } = generateUpdateQuery('Vessel', updateData, 'id', id);
+      const { query, values } = generateUpdateQuery('Vessel', snakeCaseData, 'id', id);
       
       // クエリを実行
       const result = await client.query(query, values);

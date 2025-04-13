@@ -1,22 +1,56 @@
 import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useReservationStore } from '../../stores/reservationStore';
 import { useMasterStore } from '../../stores/masterStore';
+import { useNavigationStore } from '../../stores/navigationStore';
 import { Decimal } from 'decimal.js';
+import FormGenerator, { type FormFieldConfig as BaseFormFieldConfig, type FormData } from '../../components/ui/FormGenerator';
+import { Button } from '../../components/ui/button';
+
+// 拡張したFormFieldConfigインターフェース
+interface ExtendedFormFieldConfig extends BaseFormFieldConfig {
+  showOnLabel?: boolean;
+  displayFn?: (value: string) => string;
+}
 
 export default function Reservation() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
+  
   const { reservations, fetchReservations, addReservation, deleteReservation } = useReservationStore();
   const { materials, fetchMaterials } = useMasterStore();
+  const { setPageTitle, setBackButton } = useNavigationStore();
   const [isLoading, setIsLoading] = useState(true);
   
   // フォーム用の状態
-  const [materialId, setMaterialId] = useState<number | ''>('');
-  const [lot, setLot] = useState('');
-  const [usage, setUsage] = useState('');
-  const [requiredAmount, setRequiredAmount] = useState('');
-  const [outboundDate, setOutboundDate] = useState('');
-  const [returnDate, setReturnDate] = useState('');
-  const [testName, setTestName] = useState('');
-  const [remarks, setRemarks] = useState('');
+  const [formData, setFormData] = useState({
+    materialId: '',
+    lot: '',
+    usage: '',
+    requiredAmount: '',
+    outboundDate: '',
+    returnDate: '',
+    testName: '',
+    remarks: ''
+  });
+  
+  // ページ表示時にタイトルとバックボタンを設定
+  useEffect(() => {
+    setPageTitle('出庫予約');
+    
+    // 在庫画面から来た場合は、戻るボタンで在庫画面に戻れるようにする
+    if (returnTo === 'inventory') {
+      setBackButton(true, () => navigate('/inventory'));
+    } else {
+      setBackButton(false);
+    }
+    
+    return () => {
+      setPageTitle('StockBox');
+      setBackButton(false);
+    };
+  }, [returnTo, navigate, setPageTitle, setBackButton]);
   
   useEffect(() => {
     const loadData = async () => {
@@ -28,54 +62,160 @@ export default function Reservation() {
     loadData();
   }, [fetchReservations, fetchMaterials]);
   
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // 日付のデフォルト値を設定
+  useEffect(() => {
+    const today = new Date();
     
-    if (!materialId || !lot || !requiredAmount || !outboundDate || !returnDate) {
+    // 出庫予定日のデフォルト（当日）
+    const outboundDate = new Date(today);
+    
+    // 返却予定日のデフォルト（7日後）
+    const returnDate = new Date(today);
+    returnDate.setDate(today.getDate() + 7);
+    
+    setFormData(prev => ({
+      ...prev,
+      outboundDate: outboundDate.toISOString().split('T')[0],
+      returnDate: returnDate.toISOString().split('T')[0]
+    }));
+  }, []);
+  
+  const handleChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+  
+  const handleSubmit = async (data: FormData) => {
+    if (!data.materialId || !data.lot || !data.requiredAmount || !data.outboundDate || !data.returnDate) {
       return; // 必須項目がない場合は処理しない
     }
     
     try {
+      const materialId = Number(data.materialId);
       const material = materials.find(m => m.id === materialId);
       if (!material) return;
       
+      // materialオブジェクトをコピーしてcreatedAtとupdatedAtをDate型に変換
+      const materialWithDateTypes = {
+        ...material,
+        createdAt: typeof material.createdAt === 'string' ? new Date(material.createdAt) : material.createdAt,
+        updatedAt: typeof material.updatedAt === 'string' ? new Date(material.updatedAt) : material.updatedAt
+      };
+      
       const newReservation = {
-        material_id: Number(materialId),
-        material,
-        lot,
-        usage,
-        required_amount: new Decimal(requiredAmount),
-        outbound_date: new Date(outboundDate),
-        return_date: new Date(returnDate),
-        test_name: testName,
-        remarks,
-        creator_id: 1, // ダミーのユーザーID
+        materialId: Number(data.materialId),
+        material: materialWithDateTypes,
+        lot: data.lot as string,
+        usage: data.usage as string,
+        requiredAmount: new Decimal(data.requiredAmount as string),
+        outboundDate: new Date(data.outboundDate as string),
+        returnDate: new Date(data.returnDate as string),
+        testName: data.testName as string,
+        remarks: data.remarks as string,
+        creatorId: 1, // ダミーのユーザーID
         creator: {
           id: 1,
           username: 'testuser',
           email: 'test@example.com',
-          created_at: new Date(),
-          updated_at: new Date()
+          createdAt: new Date(),
+          updatedAt: new Date()
         }
       };
       
       await addReservation(newReservation);
-      resetForm();
+      
+      // 在庫画面から来た場合は、処理完了後に在庫画面に戻る
+      if (returnTo === 'inventory') {
+        navigate('/inventory');
+      } else {
+        resetForm();
+      }
     } catch (error) {
       console.error('予約登録エラー:', error);
     }
   };
   
   const resetForm = () => {
-    setMaterialId('');
-    setLot('');
-    setUsage('');
-    setRequiredAmount('');
-    setOutboundDate('');
-    setReturnDate('');
-    setTestName('');
-    setRemarks('');
+    const today = new Date();
+    const returnDate = new Date(today);
+    returnDate.setDate(today.getDate() + 7);
+    
+    setFormData({
+      materialId: '',
+      lot: '',
+      usage: '',
+      requiredAmount: '',
+      outboundDate: today.toISOString().split('T')[0],
+      returnDate: returnDate.toISOString().split('T')[0],
+      testName: '',
+      remarks: ''
+    });
   };
+  
+  // FormGeneratorのフィールド定義
+  const getFormFields = (): ExtendedFormFieldConfig[] => [
+    {
+      id: 'materialId',
+      label: '資材',
+      elementType: 'select',
+      required: true,
+      showOnLabel: true,
+      displayFn: (value: string) => materials.find(m => m.id === Number(value))?.name || '',
+      options: materials.map(material => ({
+        label: `${material.name} ${material.specification ? `(${material.specification})` : ''}`,
+        value: String(material.id)
+      }))
+    },
+    {
+      id: 'lot',
+      label: 'ロット番号',
+      elementType: 'input',
+      required: true,
+      showOnLabel: true,
+    },
+    {
+      id: 'usage',
+      label: '使用目的',
+      elementType: 'input',
+      showOnLabel: true,
+    },
+    {
+      id: 'requiredAmount',
+      label: '必要量 (g)',
+      elementType: 'number',
+      required: true,
+      min: 0,
+      step: 0.01,
+      showOnLabel: true,
+    },
+    {
+      id: 'outboundDate',
+      label: '出庫予定日',
+      elementType: 'date',
+      required: true,
+      showOnLabel: true,
+      displayFn: (value) => new Date(value).toLocaleDateString('ja-JP'),
+    },
+    {
+      id: 'returnDate',
+      label: '返却予定日',
+      elementType: 'date',
+      required: true,
+      showOnLabel: true,
+      displayFn: (value) => new Date(value).toLocaleDateString('ja-JP'),
+    },
+    {
+      id: 'testName',
+      label: '試験名',
+      elementType: 'input',
+      showOnLabel: true,
+    },
+    {
+      id: 'remarks',
+      label: '備考',
+      elementType: 'textarea',
+      showOnLabel: true,
+    }
+  ];
   
   // 日付のフォーマット
   const formatDate = (dateString: Date) => {
@@ -85,150 +225,36 @@ export default function Reservation() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">出庫予約</h1>
-      
       {/* 予約フォーム */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">新規予約登録</h2>
-        </div>
+        {/* <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">出庫予約</h2>
+        </div> */}
         <div className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="material" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  資材 <span className="text-red-500">*</span>
-                </label>
-                <select
-                  id="material"
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  value={materialId}
-                  onChange={(e) => setMaterialId(e.target.value ? Number(e.target.value) : '')}
-                  required
-                >
-                  <option value="">選択してください</option>
-                  {materials.map((material) => (
-                    <option key={material.id} value={material.id}>
-                      {material.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="lot" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  ロット番号 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="lot"
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  value={lot}
-                  onChange={(e) => setLot(e.target.value)}
-                  required
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="usage" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  使用目的
-                </label>
-                <input
-                  type="text"
-                  id="usage"
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  value={usage}
-                  onChange={(e) => setUsage(e.target.value)}
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="requiredAmount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  必要量 (g) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  id="requiredAmount"
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  min="0"
-                  step="0.01"
-                  value={requiredAmount}
-                  onChange={(e) => setRequiredAmount(e.target.value)}
-                  required
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="outboundDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  出庫予定日 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  id="outboundDate"
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  value={outboundDate}
-                  onChange={(e) => setOutboundDate(e.target.value)}
-                  required
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="returnDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  返却予定日 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  id="returnDate"
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  value={returnDate}
-                  onChange={(e) => setReturnDate(e.target.value)}
-                  required
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="testName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  試験名
-                </label>
-                <input
-                  type="text"
-                  id="testName"
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  value={testName}
-                  onChange={(e) => setTestName(e.target.value)}
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="remarks" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  備考
-                </label>
-                <textarea
-                  id="remarks"
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  rows={3}
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                />
-              </div>
-            </div>
+          <div className="max-w-2xl mx-auto">
+            <FormGenerator
+              fields={getFormFields()}
+              initialData={formData}
+              onSubmit={handleSubmit}
+              onChange={handleChange}
+            />
             
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors mr-2 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
                 onClick={resetForm}
               >
                 リセット
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => handleSubmit(formData)}
               >
                 予約登録
-              </button>
+              </Button>
             </div>
-          </form>
+          </div>
         </div>
       </div>
       
@@ -266,13 +292,13 @@ export default function Reservation() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{reservation.material.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{reservation.lot}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {reservation.required_amount.toString()}g
+                      {reservation.requiredAmount.toString()}g
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {formatDate(reservation.outbound_date)}
+                      {formatDate(reservation.outboundDate)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {formatDate(reservation.return_date)}
+                      {formatDate(reservation.returnDate)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button

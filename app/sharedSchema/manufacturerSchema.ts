@@ -3,6 +3,7 @@ import { z } from 'zod';
 // 基本的なメーカースキーマ
 export const manufacturerBaseSchema = z.object({
   name: z.string().min(1, "メーカー名は必須です"),
+  description: z.string().optional(),
   location: z.string().optional(),
   contact: z.string().optional(),
 });
@@ -18,8 +19,8 @@ export type UpdateManufacturerInput = z.infer<typeof updateManufacturerSchema>;
 // レスポンススキーマ
 export const manufacturerSchema = manufacturerBaseSchema.extend({
   id: z.number(),
-  created_at: z.date(),
-  updated_at: z.date(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 export type Manufacturer = z.infer<typeof manufacturerSchema>;
 // 後方互換性のために残します

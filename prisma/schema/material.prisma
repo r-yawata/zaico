@@ -10,6 +10,9 @@ model Material {
   note            String    @map("note") // 備考フィールドをオプショナルから必須に変更
   enabled         Boolean   @default(true) @map("enabled") // 論理削除用フラグ
 
+　enableLotControl Boolean @map("enable_lot_control")
+  enableWeightControl Boolean @map("enable_weight_control")
+
   // リレーション：仕入先／メーカー／カテゴリー
   supplierId      Int       @map("supplier_id")
   supplier        Supplier @relation(fields: [supplierId], references: [id])
@@ -20,12 +23,15 @@ model Material {
   categoryId      Int       @map("category_id")
   category        Category   @relation(fields: [categoryId], references: [id])
   
+  vesselId      Int       @map("vessel_id")
+  vessel        Vessel   @relation(fields: [vesselId], references: [id])
+
+
   createdAt       DateTime  @default(now()) @map("created_at") 
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   stocks          Stock[]
   infoRule        StockInfoRule?
-  vessel          Vessel[]
 
   stockReservations StockReservation[]  // StockReservation とのリレーション
 } 

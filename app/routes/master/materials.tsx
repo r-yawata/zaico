@@ -5,18 +5,104 @@ import { useNavigationStore } from '../../stores/navigationStore';
 import { 
   type Material
 } from '../../sharedSchema/materialSchema';
-// import { Decimal } from 'decimal.js';
 import { Button, type ButtonProps } from '../../components/ui/button';
-import { Trash2 } from "lucide-react";
+// import { Trash2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import FormGenerator, { type FormFieldConfig, type FormData } from '../../components/ui/FormGenerator';
-import { Table, type TableColumn, type TableProps } from '../../components/ui/table';
+import FormGenerator, { type FormFieldConfig } from '../../components/ui/FormGenerator';
+// import { Table, type TableColumn, type TableProps } from '../../components/ui/table';
+import { VirtualizedGridTable } from "../../components/ui/boxgrid/virtualized-grid-table"
+import { createColumnHelper } from "@tanstack/react-table"
+
+// // Define the data type
+// interface LocationData {
+//   officialName: string
+//   name: string
+//   postalCode?: string
+//   prefecture: string
+//   status: string
+//   rawStatus: string
+//   __status__: string
+// }
+
+// const data: LocationData[] = [
+//   { officialName: "拠点D", name: "拠点D", postalCode: "", prefecture: "北海道", status: "有効", rawStatus: "active", __status__: `<div class="tableCellButton" style="background: #28a745">有効</div>` },
+//   { officialName: "test2", name: "test3", postalCode: "", prefecture: "愛知県", status: "有効", rawStatus: "active", __status__: `<div class="tableCellButton" style="background: #28a745">有効</div>` },
+//   { officialName: "新規拠点", name: "新規拠点", postalCode: "", prefecture: "北海道", status: "有効", rawStatus: "active", __status__: `<div class="tableCellButton" style="background: #28a745">有効</div>` },
+//   { officialName: "企画推進部", name: "企画推進部", postalCode: "562-0035", prefecture: "大阪府", status: "有効", rawStatus: "active", __status__: `<div class="tableCellButton" style="background: #28a745">有効</div>` },
+//   { officialName: "西日本営業部", name: "西日本", postalCode: "", prefecture: "滋賀県", status: "有効", rawStatus: "active", __status__: `<div class="tableCellButton" style="background: #28a745">有効</div>` },
+//   { officialName: "220307 動作確認", name: "220703", postalCode: "", prefecture: "大阪府", status: "有効", rawStatus: "active", __status__: `<div class="tableCellButton" style="background: #28a745">有効</div>` },
+//   { officialName: "220306 動作確認", name: "220306 動作確認", postalCode: "", prefecture: "大阪府", status: "有効", rawStatus: "active", __status__: `<div class="tableCellButton" style="background: #28a745">有効</div>` },
+//   { officialName: "西日本営業部", name: "西日本営業部", postalCode: "525-0058", prefecture: "滋賀県", status: "有効", rawStatus: "active", __status__: `<div class="tableCellButton" style="background: #28a745">有効</div>` },
+//   { officialName: "Tラボラトリー", name: "Tラボ", postalCode: "", prefecture: "滋賀県", status: "有効", rawStatus: "active", __status__: `<div class="tableCellButton" style="background: #28a745">有効</div>` },
+
+//   { officialName: "拠点D", name: "拠点D", postalCode: "", prefecture: "北海道", status: "無効", rawStatus: "inactive", __status__: `<div class="tableCellButton" style="background: #dc3545">無効</div>` },
+//   { officialName: "test2", name: "test3", postalCode: "", prefecture: "愛知県", status: "無効", rawStatus: "inactive", __status__: `<div class="tableCellButton" style="background: #dc3545">無効</div>` },
+//   { officialName: "新規拠点", name: "新規拠点", postalCode: "", prefecture: "北海道", status: "無効", rawStatus: "inactive", __status__: `<div class="tableCellButton" style="background: #dc3545">無効</div>` },
+// ]
+
+const columnHelper = createColumnHelper()
+const materialColumns = [
+  columnHelper.accessor("name", {
+    header: "資材名",
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor("specification", {
+    header: "規格",
+    cell: (info) => info.getValue() || "",
+  }),
+  columnHelper.accessor("categoryName", {
+    header: "カテゴリ",
+    cell: (info) => info.getValue() || "",
+  }),
+  columnHelper.accessor("manufacturerName", {
+    header: "メーカー",
+    cell: (info) => info.getValue() || "",
+  }),
+  columnHelper.accessor("supplierName", {
+    header: "仕入先",
+    cell: (info) => info.getValue() || "",
+  }),
+  columnHelper.accessor("vesselName", {
+    header: "容器",
+    cell: (info) => info.getValue() || "",
+  }),
+  columnHelper.accessor("unitWeight", {
+    header: "単位重量(g)",
+    cell: (info) => info.getValue() || "",
+  }),
+  columnHelper.accessor("enableLotControl", {
+    header: "ロット管理",
+    cell: (info) => info.getValue() ? "有効" : "無効",
+  }),
+  columnHelper.accessor("enableWeightControl", {
+    header: "重量管理",
+    cell: (info) => info.getValue() ? "有効" : "無効",
+  }),
+  columnHelper.accessor("note", {
+    header: "備考",
+    cell: (info) => info.getValue() || "",
+  }),
+]
 
 // ユーティリティ関数
 const cn = (...inputs: any[]) => inputs.filter(Boolean).join(" ");
 
+// MaterialsページのFormData型を独自に定義
+interface MaterialFormData extends Record<string, string> {
+  name: string;
+  specification: string;
+  categoryId: string;
+  manufacturerId: string;
+  supplierId: string;
+  vesselId: string;
+  unitWeight: string;
+  note: string;
+  enableLotControl: string;
+  enableWeightControl: string;
+}
+
 export default function Materials() {
-  const { materials, categories, manufacturers, suppliers, fetchMaterials, addMaterial, updateMaterial, deleteMaterial } = useMasterStore();
+  const { materials, categories, manufacturers, suppliers, vessels, fetchMaterials, addMaterial, updateMaterial, deleteMaterial } = useMasterStore();
   // ナビゲーションストアを取得
   const { setPageTitle, setBackButton } = useNavigationStore();
   const [isLoading, setIsLoading] = useState(true);
@@ -28,14 +114,17 @@ export default function Materials() {
   const [currentPage, setCurrentPage] = useState<'list' | 'create' | 'edit'>('list');
   
   // 新規資材用のフォーム状態
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<MaterialFormData>({
     name: '',
     specification: '',
-    category_id: '',
-    manufacturer_id: '',
-    supplier_id: '',
-    unit_weight: '',
+    categoryId: '',
+    manufacturerId: '',
+    supplierId: '',
+    vesselId: '',
+    unitWeight: '',
     note: '',
+    enableLotControl: 'false',
+    enableWeightControl: 'false',
   });
 
   // フォームエラー状態管理を追加
@@ -105,7 +194,7 @@ export default function Materials() {
       elementType: 'input',
     },
     {
-      id: 'category_id',
+      id: 'categoryId',
       label: 'カテゴリ',
       elementType: 'select',
       required: true,
@@ -115,7 +204,7 @@ export default function Materials() {
       })),
     },
     {
-      id: 'manufacturer_id',
+      id: 'manufacturerId',
       label: 'メーカー',
       elementType: 'select',
       required: true,
@@ -125,7 +214,7 @@ export default function Materials() {
       })),
     },
     {
-      id: 'supplier_id',
+      id: 'supplierId',
       label: '仕入先',
       elementType: 'select',
       required: true,
@@ -135,338 +224,343 @@ export default function Materials() {
       })),
     },
     {
-      id: 'unit_weight',
-      label: '単位重量 (g)',
-      elementType: 'number',
-      min: 0,
-      step: 0.01,
+      id: 'vesselId',
+      label: '容器タイプ',
+      elementType: 'select',
+      required: true,
+      options: vessels.map(vessel => ({
+          label: vessel.name,
+          value: String(vessel.id)
+        })),
     },
     {
-        id: 'note',
-        label: '備考',
-        elementType: 'textarea',
-    }
+      id: 'unitWeight',
+      label: '単位量 (g)',
+      elementType: 'input',
+    },
+    {
+      id: 'note',
+      label: '備考',
+      elementType: 'textarea',
+    },
+    {
+      id: 'enableLotControl',
+      label: 'ロット管理',
+      elementType: 'select',
+      options: [
+        { label: '有効', value: 'true' },
+        { label: '無効', value: 'false' }
+      ],
+    },
+    {
+      id: 'enableWeightControl',
+      label: '重量管理',
+      elementType: 'select',
+      options: [
+        { label: '有効', value: 'true' },
+        { label: '無効', value: 'false' }
+      ],
+    },
   ];
-  
-  // フォームのバリデーション関数
-  const validateForm = (data: FormData): boolean => {
+
+  // フォームバリデーション
+  const validateForm = (data: MaterialFormData): boolean => {
+    // 必須項目のチェック
     if (!data.name || data.name.trim() === '') {
-      setFormError({ key: 'error', msg: '資材名を入力してください。' });
+      setFormError({
+        key: 'error',
+        msg: '資材名は必須です'
+      });
       return false;
     }
-    
-    if (!data.category_id) {
-      setFormError({ key: 'error', msg: 'カテゴリを選択してください。' });
+
+    if (!data.vesselId) {
+      setFormError({
+        key: 'error',
+        msg: '容器は必須です'
+      });
       return false;
     }
-    
-    if (!data.manufacturer_id) {
-      setFormError({ key: 'error', msg: 'メーカーを選択してください。' });
+
+    if (!data.manufacturerId) {
+      setFormError({
+        key: 'error',
+        msg: 'メーカーは必須です'
+      });
       return false;
     }
-    
-    if (!data.supplier_id) {
-      setFormError({ key: 'error', msg: '仕入先を選択してください。' });
+
+    if (!data.supplierId) {
+      setFormError({
+        key: 'error',
+        msg: '仕入先は必須です'
+      });
       return false;
     }
-    
-    // 単位重量が入力されている場合は数値チェック
-    if (data.unit_weight && isNaN(Number(data.unit_weight))) {
-      setFormError({ key: 'error', msg: '単位重量は数値で入力してください。' });
-      return false;
-    }
-    
+
+    // エラーをクリア
     setFormError({ key: '', msg: '' });
     return true;
   };
-  
-  // エラー発生時に画面上部にスクロールする関数
+
+  // エラー表示位置までスクロール
   const scrollToError = () => {
     if (errorRef.current) {
-      errorRef.current.scrollIntoView({ behavior: 'smooth' });
+      errorRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
     }
   };
-  
-  // 型変換関数
-  const convertFormToMaterial = (formData: FormData): Omit<Material, "id" | "created_at" | "updated_at"> => {
-    // カテゴリ、サプライヤー、メーカーの参照を解決
-    // const category = categories.find(c => c.id === Number(formData.category_id));
-    // const supplier = suppliers.find(s => s.id === Number(formData.supplier_id));
-    // const manufacturer = manufacturers.find(m => m.id === Number(formData.manufacturer_id));
-    
-    // if (!category) {
-    //   throw new Error("カテゴリが見つかりません");
-    // }
-    
+
+  // フォームデータをMaterialオブジェクトに変換
+  const convertFormToMaterial = (formData: MaterialFormData): Omit<Material, "id" | "createdAt" | "updatedAt"> => {
     return {
       name: formData.name,
       specification: formData.specification || '',
-      category_id: Number(formData.category_id),
-      manufacturer_id: Number(formData.manufacturer_id),
-      supplier_id: Number(formData.supplier_id),
-      unit_weight: formData.unit_weight || undefined,
+      customAttributes: {},
+      packageCount: undefined,
+      unitWeight: formData.unitWeight || '',
+      supplierId: parseInt(formData.supplierId),
+      manufacturerId: parseInt(formData.manufacturerId),
+      categoryId: parseInt(formData.categoryId),
+      vesselId: formData.vesselId ? parseInt(formData.vesselId) : undefined,
       note: formData.note || '',
-      // custom_attributesはFormDataにない可能性があるため型アサーション
-      custom_attributes: (formData as any).custom_attributes || {},
-      package_count: formData.package_count ? Number(formData.package_count) : 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-      // カテゴリ、メーカー、サプライヤーの名前を追加
-    //   categoryName: category.name,
-    //   manufacturerName: manufacturer?.name,
-    //   supplierName: supplier?.name,
+      enableLotControl: formData.enableLotControl === 'true',
+      enableWeightControl: formData.enableWeightControl === 'true',
     };
   };
-  
-  // フォーム送信ハンドラ
-  const handleFormSubmit = async (data: FormData) => {
-    // バリデーションチェック
-    if (!validateForm(data)) {
+
+  // 新規資材登録
+  const handleFormSubmit = async (data: Record<string, string>) => {
+    // 型アサーションでMaterialFormDataに変換
+    const typedData = data as MaterialFormData;
+    if (!validateForm(typedData)) {
       scrollToError();
       return;
     }
-    
+        
     try {
-      const materialData = convertFormToMaterial(data);
-
-      await addMaterial(materialData);
-      resetForm();
+      const materialData = convertFormToMaterial(typedData);
+      try {
+        await addMaterial(materialData);
+        setCurrentPage('list');
+        resetForm();
+      } catch (error: any) {
+        console.error('資材登録中にエラーが発生しました:', error);
+        // レスポンスからエラーメッセージを取得
+        const errorMessage = error.response?.data?.error || '資材の登録に失敗しました';
+        const errorDetails = error.response?.data?.details;
+        
+        let detailMessage = '';
+        if (errorDetails) {
+          // バリデーションエラーの詳細を表示
+          Object.keys(errorDetails).forEach(key => {
+            if (key !== '_errors' && errorDetails[key]._errors.length > 0) {
+              detailMessage += `${key}: ${errorDetails[key]._errors.join(', ')} `;
+            }
+          });
+        }
+        
+        setFormError({
+          key: 'error',
+          msg: `${errorMessage}${detailMessage ? ` (${detailMessage})` : ''}`
+        });
+        scrollToError();
+      }
     } catch (error) {
-      console.error('資材保存エラー:', error);
-      setFormError({ key: 'error', msg: '資材の保存中にエラーが発生しました。' });
+      console.error('資材登録中にエラーが発生しました:', error);
+      setFormError({
+        key: 'error',
+        msg: 'フォームデータの処理に失敗しました'
+      });
       scrollToError();
     }
   };
-  
-  const handleRowClick = (material: Material, rowIndex: number) => {
-    console.log('Row clicked:', material, rowIndex);
+
+  // 資材詳細表示
+  const handleRowClick = (material: ExtendedMaterial) => {
     setEditingMaterial(material);
-    
-    // FormDataに変換
-    const newFormData: FormData = {
+    setFormData({
       name: material.name,
-      specification: material.specification || '',  
-      category_id: String(material.category_id),
-      manufacturer_id: material.manufacturer_id ? String(material.manufacturer_id) : '',
-      supplier_id: material.supplier_id ? String(material.supplier_id) : '',
-      unit_weight: material.unit_weight || '',
+      specification: material.specification || '',
+      categoryId: material.categoryId.toString(),
+      manufacturerId: material.manufacturerId.toString(),
+      supplierId: material.supplierId.toString(),
+      vesselId: material.vesselId ? material.vesselId.toString() : '',
+      unitWeight: material.unitWeight || '',
       note: material.note || '',
-    };
-    
-    // カスタム属性が存在する場合は追加
-    if (material.package_count) {
-      newFormData.package_count = String(material.package_count);
-    }
-    
-    setFormData(newFormData);
-    setIsEditing(true);
+      enableLotControl: material.enableLotControl ? 'true' : 'false',
+      enableWeightControl: material.enableWeightControl ? 'true' : 'false',
+    });
     setCurrentPage('edit');
   };
 
-  // 更新フォーム送信
-  const updateFormSubmit = async (data: FormData) => {
-    if (!editingMaterial || !editingMaterial.id) {
-      return;
-    }
-    
-    // バリデーションチェック
-    if (!validateForm(data)) {
+  // 資材更新
+  const updateFormSubmit = async (data: Record<string, string>) => {
+    // 型アサーションでMaterialFormDataに変換
+    const typedData = data as MaterialFormData;
+    if (!validateForm(typedData)) {
       scrollToError();
       return;
     }
     
+    if (!editingMaterial) return;
+    
     try {
-      const materialData = convertFormToMaterial(data);
+      const materialData = convertFormToMaterial(typedData);
+      
+      // 資材IDと更新データを分けて渡す
       await updateMaterial(editingMaterial.id, materialData);
+      
+      setCurrentPage('list');
+      setEditingMaterial(null);
       resetForm();
     } catch (error) {
-      console.error('資材更新エラー:', error);
-      setFormError({ key: 'error', msg: '資材の更新中にエラーが発生しました。' });
+      console.error('資材更新中にエラーが発生しました:', error);
+      setFormError({
+        key: 'error',
+        msg: '資材の更新に失敗しました'
+      });
       scrollToError();
     }
   };
 
+  // フォームリセット
   const resetForm = () => {
-    setEditingMaterial(null);
     setFormData({
       name: '',
       specification: '',
-      category_id: '',
-      manufacturer_id: '',
-      supplier_id: '',
-      unit_weight: '',
+      categoryId: '',
+      manufacturerId: '',
+      supplierId: '',
+      vesselId: '',
+      unitWeight: '',
       note: '',
+      enableLotControl: 'false',
+      enableWeightControl: 'false',
     });
-    setIsEditing(false);
     setCurrentPage('list');
-    setFormError({ key: '', msg: '' }); // エラー状態もリセット
+    setEditingMaterial(null);
+    setFormError({ key: '', msg: '' });
   };
-  
+
+  // 資材削除
   const handleDelete = async (id: number) => {
-    if (confirm('この資材を削除してもよろしいですか？')) {
+    if (window.confirm('この資材を削除しますか？\n削除すると元に戻せません。')) {
       try {
         await deleteMaterial(id);
-        setCurrentPage('list');
       } catch (error) {
-        console.error('資材削除エラー:', error);
-        setFormError({ key: 'error', msg: '資材の削除中にエラーが発生しました。' });
-        scrollToError();
+        console.error('資材削除中にエラーが発生しました:', error);
+        alert('資材の削除に失敗しました');
       }
     }
   };
 
-  // テーブルのカラム定義
-  const columns: TableColumn<Material>[] = [
-    { header: 'ID', accessor: 'id' },
-    { header: '資材名', accessor: 'name' },
-    { header: '規格', accessor: 'specification' },
-    { header: 'カテゴリ', accessor: 'category_name' },
-    { header: 'メーカー', accessor: 'manufacturer_name' },
-    { header: '仕入先', accessor: 'supplier_name' },
-];
-
+  // ページコンテンツ
   return (
-    <div className="space-y-4">
-      {isLoading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-2">データを読み込み中...</p>
+    <div>
+      <div ref={errorRef}>
+        {formError.key && (
+          <div className={`p-4 mb-4 rounded-md ${
+            formError.key === 'error' 
+              ? 'bg-red-50 text-red-800 dark:bg-red-900 dark:text-red-200' 
+              : 'bg-yellow-50 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+          }`}>
+            {formError.msg}
           </div>
-        </div>
-      ) : (
+        )}
+      </div>
+    
+      {/* 各ページ状態に応じた表示 */}
+      {currentPage === 'list' ? (
+        // 一覧ページ
         <>
-          {/* 資材一覧 - 常に表示するか、リスト表示時のみ表示 */}
-          {currentPage === 'list' && (<>
-                {/* <div className="p-6 border-gray-200 dark:border-gray-700">
-                    <span className="text-mg font-semibold text-gray-900 dark:text-white">
-                    {0+' 件'}
-                    </span>
-                </div> */}
-
-                <div className="flex justify-end items-center">
-                    <Button
-                    onClick={createBtnHandler}
-                    className="bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1"
-                    data-testid="create-material-button"
-                    >
-                    新規登録
-                    </Button>
-                </div>
-                
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                  <Table
-                    columns={columns}
-                    data={materials}
-                    isLoading={isLoading}
-                    onRowClick={handleRowClick}
-                    keyExtractor={(material) => material.id}
-                    emptyMessage="データがありません"
-                    rowProps={(material) => ({
-                      'data-testid': `material-row-${material.id}`
-                    })}
-                  />
-                </div>
-            </>
-          )}
-
-            {/* 資材登録/編集フォーム - ページ状態によって表示/非表示を制御 */}
-            {(currentPage === 'create') && (
-            <div className="">     
-              {/* エラー表示部分 */}
-              <div ref={errorRef}>
-                {formError.msg && (
-                  <div 
-                    className="p-4 mb-4 rounded-md" 
-                    style={{
-                      background: formError.key === "warning" ? "#F4D03F" : "#FF6666",
-                      color: "#FFFFFF",
-                      fontWeight: "bold"
-                    }}
-                  >
-                    {formError.msg}
-                  </div>
-                )}
-              </div>
-              
-              <div className="p-6">
-                <FormGenerator
-                  fields={getFormFields()}
-                  initialData={formData}
-                  onChange={handleChange}
-                  onSubmit={handleFormSubmit}
-                  className="max-w-2xl mx-auto"
-                />
-                
-                <div className="flex justify-center space-x-2 mt-4">
-                  <Button
-                    type="submit"
-                    onClick={() => handleFormSubmit(formData)}
-                    className={cn("bg-blue-600 text-white hover:bg-blue-700")}
-                  >
-                    登録
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="flex justify-between items-center">
+            {/* <h1 className="text-2xl font-bold text-gray-900 dark:text-white">資材マスター</h1> */}
+            
+            {/*　左寄せに修正  */}
+            <Button className="ml-auto" onClick={createBtnHandler}>
+              新規登録
+            </Button>
+          </div>
           
-          {currentPage === 'edit' && (
-            <div className="w-full">
-                <Tabs defaultValue="basic" className="w-full">
-                    <div className="mb-4">
-                        <TabsList>
-                            <TabsTrigger value="basic" data-testid="basic-info-tab">基本情報</TabsTrigger>
-                            <TabsTrigger value="history" data-testid="history-tab">履歴</TabsTrigger>
-                        </TabsList>
-                    </div>
-
-                    <TabsContent value="basic" className="mt-0 p-3">
-                        <div className="flex justify-end gap-2 -mt-14 mb-6">
-                            <Button 
-                                className="bg-green-600 hover:bg-green-700 text-white" 
-                                onClick={() => updateFormSubmit(formData)}
-                                data-testid="update-material-button">更新</Button>
-                            
-                            <Button
-                                variant="outline"
-                                className="bg-red-600 hover:bg-red-200 text-white border-red-600 flex items-center gap-1"
-                                onClick={() => handleDelete(editingMaterial?.id as number)}
-                                data-testid="delete-material-button"
-                            >
-                                <Trash2 className="h-4 w-4" />
-                                削除
-                            </Button>
-                        </div>
-
-                        <div className="flex flex-col md:flex-row gap-4">
-                            <div className="w-full md:w-1/2">
-                                <FormGenerator
-                                    fields={getFormFields().slice(0, 10)}
-                                    initialData={formData}
-                                    onChange={handleChange}
-                                    className="w-full"
-                                />
-                            </div>
-                            <div className="w-full md:w-1/2">
-                                <FormGenerator
-                                    fields={getFormFields().slice(10)}
-                                    initialData={formData}
-                                    onChange={handleChange}
-                                    className="w-full"
-                                />
-                            </div>
-                        </div>
-                    </TabsContent>
-
-                    <TabsContent value="history" className="mt-0 p-3">
-                        <div className="flex flex-col md:flex-row gap-4">
-                            準備中
-                        </div>
-                    </TabsContent>
-                </Tabs>
-            </div>
-          )}
+          {/* 資材一覧テーブル */}
+          <Tabs defaultValue="list">
+            {/* <TabsList>
+              <TabsTrigger value="list">リスト表示</TabsTrigger>
+              <TabsTrigger value="grid">グリッド表示</TabsTrigger>
+            </TabsList> */}
+            
+            <TabsContent value="list" className="mt-4">
+              <VirtualizedGridTable
+                data={materials as ExtendedMaterial[]}
+                columns={materialColumns}
+                enableSelection={false}
+                enableFiltering={true}
+                enableSorting={true}
+                height="calc(100vh - 300px)"
+                onRowSelectionChange={(rows) => {
+                  if (rows.length === 1) {
+                    handleRowClick(rows[0].original);
+                  }
+                }}
+              />
+            </TabsContent>
+            
+            {/* <TabsContent value="grid" className="mt-4">
+              <div style={{ height: '500px' }}>
+                <VirtualizedGridTable<LocationData>
+                  isLoading={false}
+                  data={data}
+                  columns={columns}
+                  onRowClick={(row) => console.log(row)}
+                  filterText={''}
+                  headerRenderer={(column) => {
+                    return (
+                      <div style={{ textAlign: "left" }}>
+                        {column.header}
+                      </div>
+                    );
+                  }}
+                  cellRenderer={(args) => {
+                    const isHTML = args.column.meta?.isHTML;
+                    const value = args.info.getValue();
+                    
+                    return (
+                      <div style={{ padding: "4px", textAlign: "left" }}>
+                        {isHTML ? <div dangerouslySetInnerHTML={{ __html: value }} /> : value}
+                      </div>
+                    );
+                  }}
+                />
+              </div>
+            </TabsContent> */}
+          </Tabs>
+        </>
+      ) : (
+        // 作成/編集フォーム
+        <>
+          {/* <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              {currentPage === 'create' ? '新規資材登録' : '資材編集'}
+            </h1>
+          </div> */}
+          
+          <div className="bg-white dark:bg-gray-800 p-6 w-2/3 mx-auto rounded-lg shadow">
+            <FormGenerator
+              fields={getFormFields()}
+              initialData={formData}
+              onChange={handleChange}
+              onSubmit={currentPage === 'create' ? handleFormSubmit : updateFormSubmit}
+            >
+              <div className="flex justify-center mt-4">
+                <Button type="submit" className="bg-blue-600 text-white">
+                  {currentPage === 'create' ? '新規登録' : '更新'}
+                </Button>
+              </div>
+            </FormGenerator>
+          </div>
         </>
       )}
     </div>

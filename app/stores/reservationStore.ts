@@ -11,73 +11,73 @@ tomorrow.setDate(tomorrow.getDate() + 1);
 const mockReservations: StockReservation[] = [
   {
     id: 1,
-    material_id: 1,
+    materialId: 1,
     material: {
       id: 1,
       name: 'テスト資材A',
       specification: '規格A',
-      category_id: 1,
+      categoryId: 1,
       category: {
         id: 1,
         name: '原料',
-        created_at: new Date(),
-        updated_at: new Date()
+        createdAt: new Date(),
+        updatedAt: new Date()
       },
-      created_at: new Date(),
-      updated_at: new Date()
+      createdAt: new Date(),
+      updatedAt: new Date()
     },
     lot: 'LOT20240301',
     usage: 'テスト用途',
-    required_amount: new Decimal(10.5),
-    outbound_date: today,
-    return_date: today,
-    test_name: 'テスト1',
+    requiredAmount: new Decimal(10.5),
+    outboundDate: today,
+    returnDate: today,
+    testName: 'テスト1',
     remarks: '当日返却',
-    creator_id: 1,
+    creatorId: 1,
     creator: {
       id: 1,
       username: 'testuser',
       email: 'test@example.com',
-      created_at: new Date(),
-      updated_at: new Date()
+      createdAt: new Date(),
+      updatedAt: new Date()
     },
-    created_at: new Date(),
-    updated_at: new Date()
+    createdAt: new Date(),
+    updatedAt: new Date()
   },
   {
     id: 2,
-    material_id: 2,
+    materialId: 2,
     material: {
       id: 2,
       name: 'テスト資材B',
       specification: '規格B',
-      category_id: 2,
+      categoryId: 2,
       category: {
         id: 2,
         name: '中間品',
-        created_at: new Date(),
-        updated_at: new Date()
+        createdAt: new Date(),
+        updatedAt: new Date()
       },
-      created_at: new Date(),
-      updated_at: new Date()
+      createdAt: new Date(),
+      updatedAt: new Date()
     },
     lot: 'LOT20240302',
     usage: 'テスト用途2',
-    required_amount: new Decimal(20.0),
-    outbound_date: today,
-    return_date: tomorrow,
-    test_name: 'テスト2',
+    requiredAmount: new Decimal(20.0),
+    outboundDate: today,
+    returnDate: tomorrow,
+    testName: 'テスト2',
     remarks: '翌日返却予定',
-    creator_id: 1,
+    creatorId: 1,
     creator: {
       id: 1,
       username: 'testuser',
       email: 'test@example.com',
-      created_at: new Date(),
-      updated_at: new Date()
+      createdAt: new Date(),
+      updatedAt: new Date()
     },
-    created_at: new Date(),
-    updated_at: new Date()
+    createdAt: new Date(),
+    updatedAt: new Date()
   }
 ];
 
@@ -85,9 +85,9 @@ interface ReservationState {
   reservations: StockReservation[];
   loading: boolean;
   error: string | null;
-  selected_reservation: StockReservation | null;
+  selectedReservation: StockReservation | null;
   fetchReservations: () => Promise<void>;
-  addReservation: (reservation: Omit<StockReservation, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  addReservation: (reservation: Omit<StockReservation, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateReservation: (id: number, reservationData: Partial<StockReservation>) => Promise<void>;
   deleteReservation: (id: number) => Promise<void>;
   selectReservation: (reservation: StockReservation | null) => void;
@@ -97,7 +97,7 @@ export const useReservationStore = create<ReservationState>((set, get) => ({
   reservations: mockReservations,
   loading: false,
   error: null,
-  selected_reservation: null,
+  selectedReservation: null,
 
   fetchReservations: async () => {
     set({ loading: true, error: null });
@@ -115,8 +115,8 @@ export const useReservationStore = create<ReservationState>((set, get) => ({
       const newReservation: StockReservation = {
         ...reservation,
         id: Math.max(0, ...get().reservations.map(r => r.id)) + 1,
-        created_at: new Date(),
-        updated_at: new Date()
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
       set(state => ({ 
         reservations: [...state.reservations, newReservation], 
@@ -133,7 +133,7 @@ export const useReservationStore = create<ReservationState>((set, get) => ({
       set(state => ({
         reservations: state.reservations.map(reservation => 
           reservation.id === id 
-            ? { ...reservation, ...reservationData, updated_at: new Date() } 
+            ? { ...reservation, ...reservationData, updatedAt: new Date() } 
             : reservation
         ),
         loading: false
@@ -156,6 +156,6 @@ export const useReservationStore = create<ReservationState>((set, get) => ({
   },
 
   selectReservation: (reservation) => {
-    set({ selected_reservation: reservation });
+    set({ selectedReservation: reservation });
   }
 })); 

@@ -18,8 +18,8 @@ export type UpdateSupplierInput = z.infer<typeof updateSupplierSchema>;
 // レスポンススキーマ
 export const supplierSchema = supplierBaseSchema.extend({
   id: z.number(),
-  created_at: z.date(),
-  updated_at: z.date(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 export type Supplier = z.infer<typeof supplierSchema>;
 // 後方互換性のために残します

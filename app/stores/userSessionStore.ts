@@ -2,8 +2,8 @@ import { create } from 'zustand';
 
 interface UserSessionState {
   username: string;
-  session_id: string | null;
-  is_logged_in: boolean;
+  sessionId: string | null;
+  isLoggedIn: boolean;
   
   // アクション
   setUsername: (username: string) => void;
@@ -14,21 +14,21 @@ interface UserSessionState {
 
 export const useUserSessionStore = create<UserSessionState>((set) => ({
   username: '和研 太郎',
-  session_id: null,
-  is_logged_in: true, //temp!!!
+  sessionId: null,
+  isLoggedIn: true, //temp!!!
   
   setUsername: (username: string) => set({ username }),
-  setSessionId: (sessionId) => set({ session_id: sessionId }),
+  setSessionId: (sessionId) => set({ sessionId }),
   
   login: (username, sessionId) => set({
     username,
-    session_id: sessionId,
-    is_logged_in: true
+    sessionId,
+    isLoggedIn: true
   }),
   
   logout: () => set({
     username: '',
-    session_id: null,
-    is_logged_in: false
+    sessionId: null,
+    isLoggedIn: false
   })
 })); 

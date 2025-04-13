@@ -3,11 +3,35 @@ import pkg from 'pg';
 const { Client } = pkg;
 import dotenv from 'dotenv';
 import fastifyCors from '@fastify/cors';
-import { materialRoutes, categoryRoutes, manufacturerRoutes, supplierRoutes, vesselRoutes } from './controllers';
+import { materialRoutes, categoryRoutes, manufacturerRoutes, supplierRoutes, vesselRoutes, stockRoutes } from './controllers';
+import { transformToCamelCase, transformToSnakeCase } from './utils/sqlUtils';
 
 dotenv.config();
 
 const fastify = Fastify({ logger: true });
+
+// // リクエスト本文をスネークケースに変換するフック
+// fastify.addHook('preValidation', async (request, reply) => {
+//   if (request.body && ['POST', 'PUT', 'PATCH'].includes(request.method)) {
+//     request.body = transformToSnakeCase(request.body);
+//   }
+// });
+
+// レスポンスデータをキャメルケースに変換するフック
+fastify.addHook('onSend', async (request, reply, payload) => {
+  if (payload) {
+    try {
+      const parsed = typeof payload === 'string' ? JSON.parse(payload) : payload;
+      const camelized = transformToCamelCase(parsed);
+      return JSON.stringify(camelized);
+    } catch (e) {
+      // JSONではない場合はそのまま返す
+      return payload;
+    }
+  }
+  return payload;
+});
+
 
 // PostgreSQL クライアントの設定
 const pgClient = new Client({
@@ -40,6 +64,7 @@ fastify.register(categoryRoutes, { prefix: '/api/categories' });
 fastify.register(manufacturerRoutes, { prefix: '/api/manufacturers' });
 fastify.register(supplierRoutes, { prefix: '/api/suppliers' });
 fastify.register(vesselRoutes, { prefix: '/api/vessels' });
+fastify.register(stockRoutes, { prefix: '/api/stocks' });
 
 // // 古いエンドポイント（参考のために残しておく）
 // fastify.get('/materials', async (request, reply) => {

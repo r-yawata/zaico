@@ -18,8 +18,8 @@ export type UpdateVesselInput = z.infer<typeof updateVesselSchema>;
 // レスポンススキーマ
 export const vesselSchema = vesselBaseSchema.extend({
   id: z.number(),
-  created_at: z.date(),
-  updated_at: z.date(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
   // materialはオプショナルリレーション
   material: z.any().optional(), // 循環参照を避けるためany型を使用
 });

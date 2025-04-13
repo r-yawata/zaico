@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { Decimal } from 'decimal.js';
 import { useMasterStore } from '../../stores/masterStore';
 import { useStockStore } from '../../stores/stockStore';
@@ -9,8 +10,20 @@ import { SampleStatus } from '../../types';
 import { Button } from '../../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Table, type TableColumn } from '../../components/ui/table';
+import FormGenerator, { type FormFieldConfig } from '../../components/ui/FormGenerator';
+
+// 拡張したFormFieldConfigインターフェース
+interface ExtendedFormFieldConfig extends FormFieldConfig {
+  showOnLabel?: boolean;
+  displayFn?: (value: string) => string;
+}
 
 export default function Outbound() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
+  const stockId = searchParams.get('stockId');
+  
   const { setPageTitle, setBackButton } = useNavigationStore();
   const { fetchStocks, updateStock, loading: stockLoading, error: stockError } = useStockStore();
   const { reservations, fetchReservations, updateReservation, loading: reservationLoading } = useReservationStore();
@@ -42,6 +55,24 @@ export default function Outbound() {
   // エラー表示用の参照
   const errorRef = useRef<HTMLDivElement>(null);
 
+  // URLパラメータから初期データを設定
+  useEffect(() => {
+    if (stockId) {
+      const loadSpecificStock = async () => {
+        await fetchStocks();
+        const stocks = useStockStore.getState().stocks || [];
+        const stock = stocks.find(s => s.id === Number(stockId));
+        if (stock && stock.status === SampleStatus.STORED) {
+          setSelectedStock(stock);
+          setOutboundWeight(stock.currentWeight);
+          setStep('scanning');
+        }
+      };
+      
+      loadSpecificStock();
+    }
+  }, [stockId, fetchStocks]);
+
   // ページ表示時にタイトルを設定
   useEffect(() => {
     setPageTitle('出庫');
@@ -52,14 +83,17 @@ export default function Outbound() {
     };
   }, [setPageTitle, setBackButton]);
   
-  // 戻るボタンの設定
+  // 戻るボタンの設定を修正
   useEffect(() => {
     if (step !== 'select') {
       setBackButton(true, () => handleBack());
+    } else if (returnTo === 'inventory') {
+      // 在庫画面から来た場合は、戻るボタンで在庫画面に戻れるようにする
+      setBackButton(true, () => navigate('/inventory'));
     } else {
       setBackButton(false);
     }
-  }, [step, setBackButton]);
+  }, [step, returnTo, navigate, setBackButton]);
   
   // 初期データの読み込み
   useEffect(() => {
@@ -134,7 +168,7 @@ export default function Outbound() {
     // 重量差のチェック
     if (selectedStock) {
       const tolerance = 0.05; // 5%の許容範囲（実際には資材マスタから取得）
-      const expectedWeight = selectedStock.current_weight;
+      const expectedWeight = selectedStock.currentWeight;
       const diff = weight.minus(expectedWeight).abs();
       const diffPercentage = diff.div(expectedWeight).times(100);
       
@@ -152,14 +186,14 @@ export default function Outbound() {
   const handleReservationSelect = (reservation: StockReservation) => {
     setSelectedReservation(reservation);
     // 予約に紐づく在庫を検索
-    const relatedStock = stocks.find(stock => stock.id === reservation.material_id);
+    const relatedStock = stocks.find(stock => stock.id === reservation.materialId);
     if (relatedStock) {
       setSelectedStock(relatedStock);
       // 予約情報を設定
-      setOutboundWeight(reservation.required_amount);
+      setOutboundWeight(reservation.requiredAmount);
       setPurpose(reservation.usage || '');
-      setTestName(reservation.test_name || '');
-      setReturnDate(reservation.return_date.toISOString().split('T')[0]);
+      setTestName(reservation.testName || '');
+      setReturnDate(reservation.returnDate ? reservation.returnDate.toISOString().split('T')[0] : '');
       setRemarks(reservation.remarks || '');
       
       setStep('scanning');
@@ -172,7 +206,7 @@ export default function Outbound() {
   const handleStockSelect = (stock: Stock) => {
     setSelectedStock(stock);
     // デフォルトで全量出庫に設定
-    setOutboundWeight(stock.current_weight);
+    setOutboundWeight(stock.currentWeight);
     setStep('scanning');
   };
   
@@ -185,6 +219,36 @@ export default function Outbound() {
     }
   };
   
+  // FormGeneratorのフィールド定義
+  const getFormFields = (): ExtendedFormFieldConfig[] => [
+    {
+      id: 'purpose',
+      label: '用途',
+      elementType: 'input',
+      showOnLabel: true,
+    },
+    {
+      id: 'testName',
+      label: '試験名',
+      elementType: 'input',
+      showOnLabel: true,
+    },
+    {
+      id: 'returnDate',
+      label: '返却予定日',
+      elementType: 'date',
+      required: true,
+      showOnLabel: true,
+      displayFn: (value) => new Date(value).toLocaleDateString('ja-JP'),
+    },
+    {
+      id: 'remarks',
+      label: '備考',
+      elementType: 'textarea',
+      showOnLabel: true,
+    }
+  ];
+  
   // 出庫の確定処理
   const handleOutbound = async () => {
     if (!selectedStock) return;
@@ -194,10 +258,10 @@ export default function Outbound() {
       const updatedStock = {
         ...selectedStock,
         status: SampleStatus.OUTBOUND,
-        current_weight: selectedStock.current_weight.minus(outboundWeight),
-        last_outbound_date: new Date(),
-        last_outbound_amount: outboundWeight,
-        update_date: new Date()
+        currentWeight: selectedStock.currentWeight.minus(outboundWeight),
+        lastOutboundDate: new Date(),
+        lastOutboundAmount: outboundWeight,
+        updateDate: new Date()
       };
       
       await updateStock(selectedStock.id, updatedStock);
@@ -221,9 +285,14 @@ export default function Outbound() {
   // 前のステップに戻る
   const handleBack = () => {
     if (step === 'scanning') {
-      setStep('select');
-      setSelectedStock(null);
-      setSelectedReservation(null);
+      if (returnTo === 'inventory' && stockId) {
+        // 在庫画面から特定の在庫を選択して来た場合は、在庫画面に戻る
+        navigate('/inventory');
+      } else {
+        setStep('select');
+        setSelectedStock(null);
+        setSelectedReservation(null);
+      }
     } else if (step === 'weighing') {
       setStep('scanning');
     } else if (step === 'confirm') {
@@ -245,7 +314,13 @@ export default function Outbound() {
     setReturnDate(today.toISOString().split('T')[0]);
     setRemarks('');
     setWeightError(null);
-    setStep('select');
+    
+    // 在庫画面から来た場合は、処理完了後に在庫画面に戻る
+    if (returnTo === 'inventory') {
+      navigate('/inventory');
+    } else {
+      setStep('select');
+    }
   };
   
   // 予約一覧のカラム定義 
@@ -253,11 +328,11 @@ export default function Outbound() {
     { header: '予約ID', accessor: 'id' },
     { header: '資材', accessor: (res) => res.material?.name || '不明' },
     { header: 'ロット', accessor: 'lot' },
-    { header: '申請日', accessor: (res) => res.created_at.toLocaleDateString('ja-JP') },
-    { header: '出庫予定日', accessor: (res) => res.outbound_date.toLocaleDateString('ja-JP') },
-    { header: '返却予定日', accessor: (res) => res.return_date.toLocaleDateString('ja-JP') },
+    { header: '申請日', accessor: (res) => res.createdAt ? res.createdAt.toLocaleDateString('ja-JP') : '未設定' },
+    { header: '出庫予定日', accessor: (res) => res.outboundDate ? res.outboundDate.toLocaleDateString('ja-JP') : '未設定' },
+    { header: '返却予定日', accessor: (res) => res.returnDate ? res.returnDate.toLocaleDateString('ja-JP') : '未設定' },
     { header: '用途', accessor: (res) => res.usage || '未指定' },
-    { header: '状態', accessor: () => '予約中' } // 予約中のもののみ表示するため、固定値
+    { header: '状態', accessor: () => '予約中' }
   ];
   
   // 在庫一覧のカラム定義
@@ -265,15 +340,13 @@ export default function Outbound() {
     { header: 'ID', accessor: 'id' },
     { header: '資材', accessor: (stock) => stock.material?.name || '不明' },
     { header: 'ロット', accessor: 'lot' },
-    { header: '現在重量', accessor: (stock) => `${stock.current_weight?.toString() || '0'} g` },
-    { header: '入庫日', accessor: (stock) => stock.registration_date.toLocaleDateString('ja-JP') },
-    { header: '有効期限', accessor: (stock) => stock.expiration_date?.toLocaleDateString('ja-JP') || '無期限' }
+    { header: '現在重量', accessor: (stock) => `${stock.currentWeight?.toString() || '0'} g` },
+    { header: '入庫日', accessor: (stock) => stock.registrationDate ? stock.registrationDate.toLocaleDateString('ja-JP') : '未設定' },
+    { header: '有効期限', accessor: (stock) => stock.expirationDate?.toLocaleDateString('ja-JP') || '無期限' }
   ];
   
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">出庫処理</h1>
-      
+    <div className="space-y-6">      
       {(stockError || weightError) && (
         <div ref={errorRef} className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative dark:bg-red-900 dark:text-red-100 dark:border-red-700" role="alert">
           <span className="block sm:inline">{stockError || weightError}</span>
@@ -382,7 +455,7 @@ export default function Outbound() {
                           </div>
                           <div>
                             <span className="text-sm font-medium text-gray-500 dark:text-gray-400">現在重量:</span>
-                            <div className="text-lg font-semibold">{selectedStock.current_weight.toString()} g</div>
+                            <div className="text-lg font-semibold">{selectedStock.currentWeight.toString()} g</div>
                           </div>
                           <div>
                             <span className="text-sm font-medium text-gray-500 dark:text-gray-400">出庫予定量:</span>
@@ -391,68 +464,33 @@ export default function Outbound() {
                         </div>
                       </div>
                       
-                      <form className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label htmlFor="purpose" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            用途
-                          </label>
-                          <input
-                            type="text"
-                            id="purpose"
-                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                            value={purpose}
-                            onChange={(e) => setPurpose(e.target.value)}
-                          />
-                        </div>
+                      <div className="max-w-2xl mx-auto">
+                        <FormGenerator
+                          fields={getFormFields()}
+                          initialData={{
+                            purpose,
+                            testName,
+                            returnDate,
+                            remarks
+                          }}
+                          onSubmit={() => handleScan()}
+                          onChange={(field, value) => {
+                            if (field === 'purpose') setPurpose(value);
+                            if (field === 'testName') setTestName(value);
+                            if (field === 'returnDate') setReturnDate(value);
+                            if (field === 'remarks') setRemarks(value);
+                          }}
+                        />
                         
-                        <div>
-                          <label htmlFor="testName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            試験名
-                          </label>
-                          <input
-                            type="text"
-                            id="testName"
-                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                            value={testName}
-                            onChange={(e) => setTestName(e.target.value)}
-                          />
+                        <div className="flex justify-center mt-6">
+                          <Button
+                            type="button"
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                            onClick={handleScan}
+                          >
+                            バーコードスキャン
+                          </Button>
                         </div>
-                        
-                        <div>
-                          <label htmlFor="returnDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            返却予定日
-                          </label>
-                          <input
-                            type="date"
-                            id="returnDate"
-                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                            value={returnDate}
-                            onChange={(e) => setReturnDate(e.target.value)}
-                          />
-                        </div>
-                        
-                        <div className="md:col-span-2">
-                          <label htmlFor="remarks" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            備考
-                          </label>
-                          <textarea
-                            id="remarks"
-                            rows={3}
-                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                            value={remarks}
-                            onChange={(e) => setRemarks(e.target.value)}
-                          ></textarea>
-                        </div>
-                      </form>
-                      
-                      <div className="flex justify-center mt-4">
-                        <button
-                          type="button"
-                          className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                          onClick={handleScan}
-                        >
-                          バーコードスキャン
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -483,7 +521,7 @@ export default function Outbound() {
                       
                       <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
                         <p>予定出庫量: {outboundWeight.toString()} g</p>
-                        <p>現在の重量: {selectedStock.current_weight.toString()} g</p>
+                        <p>現在の重量: {selectedStock.currentWeight.toString()} g</p>
                       </div>
                     </div>
                   </div>
@@ -572,7 +610,7 @@ export default function Outbound() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm font-medium">残量:</span>
-                          <span className="text-sm">{selectedStock.current_weight.minus(outboundWeight).toString()} g</span>
+                          <span className="text-sm">{selectedStock.currentWeight.minus(outboundWeight).toString()} g</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm font-medium">返却予定日:</span>

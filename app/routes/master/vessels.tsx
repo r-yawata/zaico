@@ -6,10 +6,37 @@ import { Button } from '../../components/ui/button';
 import { Trash2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import FormGenerator, { type FormFieldConfig, type FormData } from '../../components/ui/FormGenerator';
-import { Table, type TableColumn } from '../../components/ui/table';
+// import { Table, type TableColumn } from '../../components/ui/table';
+import { VirtualizedGridTable } from "../../components/ui/boxgrid/virtualized-grid-table"
+import { createColumnHelper } from "@tanstack/react-table"
 
 // ユーティリティ関数
 const cn = (...inputs: any[]) => inputs.filter(Boolean).join(" ");
+
+// カラムヘルパーの作成
+const columnHelper = createColumnHelper<Vessel>()
+const vesselColumns = [
+  columnHelper.accessor("id", {
+    header: "ID",
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor("name", {
+    header: "容器名",
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor("weight", {
+    header: "重量 (g)",
+    cell: (info) => {
+      const weight = info.getValue();
+      return Number(weight).toFixed(3);
+    }
+  }),
+];
+
+// FormFieldConfigの型を拡張
+interface ExtendedFormFieldConfig extends FormFieldConfig {
+  inputType?: string;
+}
 
 export default function Vessels() {
   const { vessels, fetchVessels, addVessel, updateVessel, deleteVessel } = useMasterStore();
@@ -84,7 +111,7 @@ export default function Vessels() {
   };
 
   // FormGeneratorのフィールド定義
-  const getFormFields = (): FormFieldConfig[] => [
+  const getFormFields = (): ExtendedFormFieldConfig[] => [
     {
       id: 'name',
       label: '容器名',
@@ -144,7 +171,8 @@ export default function Vessels() {
       
       await addVessel(vesselData as any);
       
-      resetForm();
+      // フォームをクリアするが、画面遷移はしない
+      clearForm();
     } catch (error) {
       console.error('容器保存エラー:', error);
       setFormError({ key: 'error', msg: '容器の保存中にエラーが発生しました。' });
@@ -152,8 +180,8 @@ export default function Vessels() {
     }
   };
   
-  const handleRowClick = (vessel: Vessel, rowIndex: number) => {
-    console.log('Row clicked:', vessel, rowIndex);
+  const handleRowClick = (vessel: Vessel) => {
+    console.log('Row clicked:', vessel);
     setEditingVessel(vessel);
     setFormData({
       name: vessel.name,
@@ -163,17 +191,19 @@ export default function Vessels() {
     setCurrentPage('edit');
   };
 
-  const updateFormSubmit = async (vessel: Vessel) => {
-    if (!vessel.id) {
-      return; // IDがない場合は更新しない
+  const updateFormSubmit = async (data: FormData) => {
+    if (!editingVessel) {
+      return; // 編集中の容器がない場合は更新しない
     }
     
     try {
       // material_idを正しく設定
       const vesselData = {
-        ...vessel,
+        ...editingVessel,
+        name: data.name,
+        weight: data.weight,
       };
-      await updateVessel(vessel.id, vesselData);
+      await updateVessel(editingVessel.id, vesselData);
       resetForm();
     } catch (error) {
       console.error('容器更新エラー:', error);
@@ -182,6 +212,7 @@ export default function Vessels() {
     }
   };
 
+  // 元のresetFormはそのまま残す（戻るボタンなどで使用）
   const resetForm = () => {
     setEditingVessel(null);
     setFormData({
@@ -191,6 +222,20 @@ export default function Vessels() {
     setIsEditing(false);
     setCurrentPage('list');
     setFormError({ key: '', msg: '' }); // エラー状態もリセット
+  };
+  
+  // フォームの内容だけをクリアする新しい関数を追加
+  const clearForm = () => {
+    setEditingVessel(null);
+    setFormData({
+      name: '',
+      weight: '',
+    });
+    setIsEditing(false);
+    setFormError({ key: '', msg: '' }); // エラー状態もリセット
+    // 成功メッセージを表示
+    setFormError({ key: 'warning', msg: '容器を登録しました。続けて登録できます。' });
+    scrollToError();
   };
   
   const handleDelete = async (id: number) => {
@@ -205,13 +250,6 @@ export default function Vessels() {
       }
     }
   };
-
-  // テーブルのカラム定義
-  const columns: TableColumn<Vessel>[] = [
-    { header: 'ID', accessor: 'id' },
-    { header: '容器名', accessor: 'name' },
-    { header: '重量 (g)', accessor: 'weight' },
-  ];
 
   return (
     <div className="space-y-4">
@@ -237,16 +275,18 @@ export default function Vessels() {
                 </div>
                 
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                  <Table
-                    columns={columns}
+                  <VirtualizedGridTable
                     data={vessels}
-                    isLoading={isLoading}
-                    onRowClick={handleRowClick}
-                    keyExtractor={(vessel) => vessel.id}
-                    emptyMessage="データがありません"
-                    rowProps={(vessel) => ({
-                      'data-testid': `vessel-row-${vessel.id}`
-                    })}
+                    columns={vesselColumns}
+                    enableSelection={false}
+                    enableFiltering={true}
+                    enableSorting={true}
+                    height="calc(100vh - 300px)"
+                    onRowSelectionChange={(rows) => {
+                      if (rows.length === 1) {
+                        handleRowClick(rows[0].original);
+                      }
+                    }}
                   />
                 </div>
             </>
@@ -257,112 +297,64 @@ export default function Vessels() {
             <div className="">
               {/* エラー表示部分 */}
               <div ref={errorRef}>
-                {formError.msg && (
-                  <div 
-                    className="p-4 mb-4 rounded-md" 
-                    style={{
-                      background: formError.key === "warning" ? "#F4D03F" : "#FF6666",
-                      color: "#FFFFFF",
-                      fontWeight: "bold"
-                    }}
-                  >
+                {formError.key && (
+                  <div className={`p-4 mb-4 rounded-md ${
+                    formError.key === 'error' 
+                      ? 'bg-red-50 text-red-800 dark:bg-red-900 dark:text-red-200' 
+                      : 'bg-yellow-50 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  }`}>
                     {formError.msg}
                   </div>
                 )}
               </div>
               
-              <div className="p-6">
+              <div className="bg-white dark:bg-gray-800 p-6 w-2/3 mx-auto rounded-lg shadow">
                 <FormGenerator
                   fields={getFormFields()}
                   initialData={formData}
                   onChange={handleChange}
-                  onSubmit={handleFormSubmit}
-                  className="max-w-2xl mx-auto"
-                />
-                
-                <div className="flex justify-center space-x-2 mt-4">
-                  <Button
-                    type="submit"
-                    onClick={() => handleFormSubmit(formData as any)}
-                    className={cn("bg-blue-600 text-white hover:bg-blue-700")}
-                    data-testid="submit-vessel-button"
-                  >
-                    登録
-                  </Button>
-                </div>
+                  onSubmit={currentPage === 'create' ? handleFormSubmit : updateFormSubmit}
+                >
+                  <div className="flex justify-center mt-4">
+                    <Button type="submit" className="bg-blue-600 text-white">
+                      {'新規登録'}
+                    </Button>
+                  </div>
+                </FormGenerator>
               </div>
             </div>
           )}
-          
-          {currentPage === 'edit' && (
-            <div className="w-full">
+
+          {/* 編集フォーム */}
+          {(currentPage === 'edit') && (
+            <div className="">
               {/* エラー表示部分 */}
               <div ref={errorRef}>
-                {formError.msg && (
-                  <div 
-                    className="p-4 mb-4 rounded-md" 
-                    style={{
-                      background: formError.key === "warning" ? "#F4D03F" : "#FF6666",
-                      color: "#FFFFFF",
-                      fontWeight: "bold"
-                    }}
-                  >
+                {formError.key && (
+                  <div className={`p-4 mb-4 rounded-md ${
+                    formError.key === 'error' 
+                      ? 'bg-red-50 text-red-800 dark:bg-red-900 dark:text-red-200' 
+                      : 'bg-yellow-50 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  }`}>
                     {formError.msg}
                   </div>
                 )}
               </div>
               
-              <Tabs defaultValue="basic" className="w-full">
-                <div className="mb-4">
-                    <TabsList>
-                        <TabsTrigger value="basic" data-testid="basic-info-tab">基本情報</TabsTrigger>
-                        <TabsTrigger value="history" data-testid="history-tab">履歴</TabsTrigger>
-                    </TabsList>
-                </div>
-
-                <TabsContent value="basic" className="mt-0 p-3">
-                    <div className="flex justify-end gap-2 -mt-14 mb-6">
-                        <Button 
-                            className="bg-green-600 hover:bg-green-700 text-white" 
-                            onClick={() => {
-                              if (validateForm(formData)) {
-                                updateFormSubmit({...editingVessel, ...formData} as Vessel);
-                              } else {
-                                scrollToError();
-                              }
-                            }}
-                            data-testid="update-vessel-button"
-                        >更新</Button>
-                        
-                        <Button
-                            variant="outline"
-                            className="bg-red-600 hover:bg-red-200 text-white border-red-600 flex items-center gap-1"
-                            onClick={() => handleDelete(editingVessel?.id as number)}
-                            data-testid="delete-vessel-button"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                            削除
-                        </Button>
-                    </div>
-
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="w-full md:w-1/2">
-                            <FormGenerator
-                                fields={getFormFields()}
-                                initialData={formData}
-                                onChange={handleChange}
-                                className="w-full"
-                            />
-                        </div>
-                    </div>
-                </TabsContent>
-
-                <TabsContent value="history" className="mt-0 p-3">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        準備中
-                    </div>
-                </TabsContent>
-              </Tabs>
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+                <FormGenerator
+                  fields={getFormFields()}
+                  initialData={formData}
+                  onChange={handleChange}
+                  onSubmit={updateFormSubmit}
+                >
+                  <div className="flex justify-center mt-4">
+                    <Button type="submit" className="bg-blue-600 text-white">
+                      更新
+                    </Button>
+                  </div>
+                </FormGenerator>
+              </div>
             </div>
           )}
         </>

@@ -6,10 +6,37 @@ import { Button } from '../../components/ui/button';
 import { Trash2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import FormGenerator, { type FormFieldConfig, type FormData } from '../../components/ui/FormGenerator';
-import { Table, type TableColumn } from '../../components/ui/table';
+import { VirtualizedGridTable } from "../../components/ui/boxgrid/virtualized-grid-table"
+import { createColumnHelper } from "@tanstack/react-table"
 
 // ユーティリティ関数
 const cn = (...inputs: any[]) => inputs.filter(Boolean).join(" ");
+
+// カラムヘルパーの作成
+const columnHelper = createColumnHelper<Supplier>()
+const supplierColumns = [
+  columnHelper.accessor("id", {
+    header: "ID",
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor("name", {
+    header: "仕入先名",
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor("contact", {
+    header: "連絡先",
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor("address", {
+    header: "住所",
+    cell: (info) => info.getValue(),
+  }),
+];
+
+// FormFieldConfigの型を拡張
+interface ExtendedFormFieldConfig extends FormFieldConfig {
+  inputType?: string;
+}
 
 export default function Suppliers() {
   const { suppliers, fetchSuppliers, addSupplier, updateSupplier, deleteSupplier } = useMasterStore();
@@ -84,24 +111,25 @@ export default function Suppliers() {
   };
 
   // FormGeneratorのフィールド定義
-  const getFormFields = (): FormFieldConfig[] => [
+  const getFormFields = (): ExtendedFormFieldConfig[] => [
     {
       id: 'name',
       label: '仕入先名',
       elementType: 'input',
       required: true,
     },
-    {
-      id: 'contact',
-      label: '連絡先',
-      elementType: 'input',
-    },
-    {
-      id: 'address',
-      label: '住所',
-      elementType: 'textarea',
-      rows: 3,
-    }
+    // {
+    //   id: 'contact',
+    //   label: '連絡先',
+    //   elementType: 'input',
+    //   required: true,
+    // },
+    // {
+    //   id: 'address',
+    //   label: '住所',
+    //   elementType: 'input',
+    //   required: true,
+    // },
   ];
   
   // フォームのバリデーション関数
@@ -110,6 +138,16 @@ export default function Suppliers() {
       setFormError({ key: 'error', msg: '仕入先名を入力してください。' });
       return false;
     }
+    
+    // if (!data.contact || data.contact.trim() === '') {
+    //   setFormError({ key: 'error', msg: '連絡先を入力してください。' });
+    //   return false;
+    // }
+    
+    // if (!data.address || data.address.trim() === '') {
+    //   setFormError({ key: 'error', msg: '住所を入力してください。' });
+    //   return false;
+    // }
     
     setFormError({ key: '', msg: '' });
     return true;
@@ -138,7 +176,8 @@ export default function Suppliers() {
       
       await addSupplier(supplierData as any);
       
-      resetForm();
+      // フォームをクリアするが、画面遷移はしない
+      clearForm();
     } catch (error) {
       console.error('仕入先保存エラー:', error);
       setFormError({ key: 'error', msg: '仕入先の保存中にエラーが発生しました。' });
@@ -146,8 +185,8 @@ export default function Suppliers() {
     }
   };
   
-  const handleRowClick = (supplier: Supplier, rowIndex: number) => {
-    console.log('Row clicked:', supplier, rowIndex);
+  const handleRowClick = (supplier: Supplier) => {
+    console.log('Row clicked:', supplier);
     setEditingSupplier(supplier);
     setFormData({
       name: supplier.name,
@@ -158,13 +197,19 @@ export default function Suppliers() {
     setCurrentPage('edit');
   };
 
-  const updateFormSubmit = async (supplier: Supplier) => {
-    if (!supplier.id) {
-      return; // IDがない場合は更新しない
+  const updateFormSubmit = async (data: FormData) => {
+    if (!editingSupplier) {
+      return; // 編集中の仕入先がない場合は更新しない
     }
     
     try {
-      await updateSupplier(supplier.id, supplier);
+      const supplierData = {
+        ...editingSupplier,
+        name: data.name,
+        contact: data.contact,
+        address: data.address,
+      };
+      await updateSupplier(editingSupplier.id, supplierData);
       resetForm();
     } catch (error) {
       console.error('仕入先更新エラー:', error);
@@ -173,6 +218,7 @@ export default function Suppliers() {
     }
   };
 
+  // 元のresetFormはそのまま残す（戻るボタンなどで使用）
   const resetForm = () => {
     setEditingSupplier(null);
     setFormData({
@@ -183,6 +229,21 @@ export default function Suppliers() {
     setIsEditing(false);
     setCurrentPage('list');
     setFormError({ key: '', msg: '' }); // エラー状態もリセット
+  };
+  
+  // フォームの内容だけをクリアする新しい関数を追加
+  const clearForm = () => {
+    setEditingSupplier(null);
+    setFormData({
+      name: '',
+      contact: '',
+      address: '',
+    });
+    setIsEditing(false);
+    setFormError({ key: '', msg: '' }); // エラー状態もリセット
+    // 成功メッセージを表示
+    setFormError({ key: 'warning', msg: '仕入先を登録しました。続けて登録できます。' });
+    scrollToError();
   };
   
   const handleDelete = async (id: number) => {
@@ -197,14 +258,6 @@ export default function Suppliers() {
       }
     }
   };
-
-  // テーブルのカラム定義
-  const columns: TableColumn<Supplier>[] = [
-    { header: 'ID', accessor: 'id' },
-    { header: '仕入先名', accessor: 'name' },
-    { header: '連絡先', accessor: 'contact' },
-    { header: '住所', accessor: 'address' },
-  ];
 
   return (
     <div className="space-y-4">
@@ -230,16 +283,18 @@ export default function Suppliers() {
                 </div>
                 
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                  <Table
-                    columns={columns}
+                  <VirtualizedGridTable
                     data={suppliers}
-                    isLoading={isLoading}
-                    keyExtractor={(supplier: Supplier) => supplier.id}
-                    emptyMessage="データがありません"
-                    onRowClick={handleRowClick}
-                    rowProps={(supplier) => ({
-                      'data-testid': `supplier-row-${supplier.id}`
-                    })}
+                    columns={supplierColumns}
+                    enableSelection={false}
+                    enableFiltering={true}
+                    enableSorting={true}
+                    height="calc(100vh - 300px)"
+                    onRowSelectionChange={(rows) => {
+                      if (rows.length === 1) {
+                        handleRowClick(rows[0].original);
+                      }
+                    }}
                   />
                 </div>
             </>
@@ -250,112 +305,64 @@ export default function Suppliers() {
             <div className="">
               {/* エラー表示部分 */}
               <div ref={errorRef}>
-                {formError.msg && (
-                  <div 
-                    className="p-4 mb-4 rounded-md" 
-                    style={{
-                      background: formError.key === "warning" ? "#F4D03F" : "#FF6666",
-                      color: "#FFFFFF",
-                      fontWeight: "bold"
-                    }}
-                  >
+                {formError.key && (
+                  <div className={`p-4 mb-4 rounded-md ${
+                    formError.key === 'error' 
+                      ? 'bg-red-50 text-red-800 dark:bg-red-900 dark:text-red-200' 
+                      : 'bg-yellow-50 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  }`}>
                     {formError.msg}
                   </div>
                 )}
               </div>
               
-              <div className="p-6">
+              <div className="bg-white dark:bg-gray-800 p-6 w-2/3 mx-auto rounded-lg shadow">
                 <FormGenerator
                   fields={getFormFields()}
                   initialData={formData}
                   onChange={handleChange}
-                  onSubmit={handleFormSubmit}
-                  className="max-w-2xl mx-auto"
-                />
-                
-                <div className="flex justify-center space-x-2 mt-4">
-                  <Button
-                    type="submit"
-                    onClick={() => handleFormSubmit(formData as any)}
-                    className={cn("bg-blue-600 text-white hover:bg-blue-700")}
-                    data-testid="submit-supplier-button"
-                  >
-                    登録
-                  </Button>
-                </div>
+                  onSubmit={currentPage === 'create' ? handleFormSubmit : updateFormSubmit}
+                >
+                  <div className="flex justify-center mt-4">
+                    <Button type="submit" className="bg-blue-600 text-white">
+                      {'新規登録'}
+                    </Button>
+                  </div>
+                </FormGenerator>
               </div>
             </div>
           )}
-          
-          {currentPage === 'edit' && (
-            <div className="w-full">
+
+          {/* 編集フォーム */}
+          {(currentPage === 'edit') && (
+            <div className="">
               {/* エラー表示部分 */}
               <div ref={errorRef}>
-                {formError.msg && (
-                  <div 
-                    className="p-4 mb-4 rounded-md" 
-                    style={{
-                      background: formError.key === "warning" ? "#F4D03F" : "#FF6666",
-                      color: "#FFFFFF",
-                      fontWeight: "bold"
-                    }}
-                  >
+                {formError.key && (
+                  <div className={`p-4 mb-4 rounded-md ${
+                    formError.key === 'error' 
+                      ? 'bg-red-50 text-red-800 dark:bg-red-900 dark:text-red-200' 
+                      : 'bg-yellow-50 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  }`}>
                     {formError.msg}
                   </div>
                 )}
               </div>
               
-              <Tabs defaultValue="basic" className="w-full">
-                <div className="mb-4">
-                    <TabsList>
-                        <TabsTrigger value="basic" data-testid="basic-info-tab">基本情報</TabsTrigger>
-                        <TabsTrigger value="history" data-testid="history-tab">履歴</TabsTrigger>
-                    </TabsList>
-                </div>
-
-                <TabsContent value="basic" className="mt-0 p-3">
-                    <div className="flex justify-end gap-2 -mt-14 mb-6">
-                        <Button 
-                            className="bg-green-600 hover:bg-green-700 text-white" 
-                            onClick={() => {
-                              if (validateForm(formData)) {
-                                updateFormSubmit({...editingSupplier, ...formData} as Supplier);
-                              } else {
-                                scrollToError();
-                              }
-                            }}
-                            data-testid="update-supplier-button"
-                        >更新</Button>
-                        
-                        <Button
-                            variant="outline"
-                            className="bg-red-600 hover:bg-red-200 text-white border-red-600 flex items-center gap-1"
-                            onClick={() => handleDelete(editingSupplier?.id as number)}
-                            data-testid="delete-supplier-button"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                            削除
-                        </Button>
-                    </div>
-
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="w-full md:w-1/2">
-                            <FormGenerator
-                                fields={getFormFields()}
-                                initialData={formData}
-                                onChange={handleChange}
-                                className="w-full"
-                            />
-                        </div>
-                    </div>
-                </TabsContent>
-
-                <TabsContent value="history" className="mt-0 p-3">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        準備中
-                    </div>
-                </TabsContent>
-              </Tabs>
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+                <FormGenerator
+                  fields={getFormFields()}
+                  initialData={formData}
+                  onChange={handleChange}
+                  onSubmit={updateFormSubmit}
+                >
+                  <div className="flex justify-center mt-4">
+                    <Button type="submit" className="bg-blue-600 text-white">
+                      更新
+                    </Button>
+                  </div>
+                </FormGenerator>
+              </div>
             </div>
           )}
         </>
